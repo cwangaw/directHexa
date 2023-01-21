@@ -8,10 +8,10 @@ include $(HOME)/Config/Make.cf.$(TARG)
 
 # Files =======================================================================
 
-SRC = baseObjects.cpp polyMesh.cpp
+SRC = baseObjects.cpp hexaMesh.cpp
 TPL = 
-OBJ = baseObjects.o polyMesh.o
-INC = baseObjects.h polyMesh.h
+OBJ = baseObjects.o hexaMesh.o
+INC = baseObjects.h hexaMesh.h
 C++C = g++
 
 # Main Rules ==================================================================

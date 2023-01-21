@@ -6,5 +6,4 @@
 #include <assert.h>
 
 #include "debug.h"
-#include "polyMesh.h"
-using namespace polymesh;
+#include "hexaMesh.h"
