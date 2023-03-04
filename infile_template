@@ -2,14 +2,12 @@ test/   	# dirName, output directory (preamble)
 
 ### MESH PARAMETERS ###########################################################
 
-o		        # meshType ('o' = regularly deviated in one direction (x), 
-            #           't' = regularly deviated in two directions (x and z),
-            #           'r' = randomly deviated)
+d		        # meshType (deviated, or randomly deviated)
 0,1        	# xMin,xMax
 0,1        	# yMin,yMax 
 0,1        	# zMin,zMax 
-4,4,4  	    # nx,ny,nz
-0.2         # distortion factor
+6,6,6  	    # nx,ny,nz
+0.1         # distortion factor
 
 ### FINITE ELEMENTS ###########################################################
 

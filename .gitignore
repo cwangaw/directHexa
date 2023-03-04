@@ -1,0 +1,10 @@
+.vscode/c_cpp_properties.json
+.vscode/settings.json
+debug.h
+Utilities/utilities_x86_64.a
+test/meshOut.txt
+test/meshOut.m
+Reader/reader_x86_64.a
+Mesh/mesh_x86_64.a
+directhexa.x86_64
+directhexa_x86_64.a

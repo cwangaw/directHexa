@@ -93,6 +93,10 @@ inline bool eq_eps(const Tensor1& t0, const Tensor1& t1) {
 inline bool ne_eps(const Tensor1& t0, const Tensor1& t1) {
   return std::abs(t0[0]-t1[0]) > baseobjects_eps || std::abs(t0[1]-t1[1]) > baseobjects_eps || std::abs(t0[2]-t1[2]) > baseobjects_eps; }
 
+inline Tensor1 cross(Tensor1 t0, Tensor1 t1) {
+  return Tensor1(t0[1]*t1[2]-t0[2]*t1[1], t0[2]*t1[0]-t0[0]*t1[2], t0[0]*t1[1]-t0[1]*t1[0]);
+};
+
 class Tensor2 {
  private:
   double the_tensor[3][3];
