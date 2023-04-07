@@ -1,9 +1,6 @@
 #ifndef __ellipticpde_h_included__
 #define __ellipticpde_h_included__
 
-//#include <string>
-//#include <cmath>
-
 #include "Mesh/baseObjects.h"
 #include "Mesh/hexaMesh.h"
 #include "directSerendipity.h"
@@ -15,7 +12,7 @@
 //  EQUATIONS
 //
 //    - div D grad p + div(b p) + c.grad p + a p = f
-//                       in Omega (bounded, connected, Lipschitz domain in R^2)
+//                       in Omega (a rectangular cuboidal domain in R^3)
 //    p = g              on the boundary of Omega
 //    where D is a tensor (matrix), b and c are vectors.
 //
@@ -26,7 +23,7 @@
 //      boundary nodes set to g. We use a nodal basis for the space.
 //      
 //  ELEMENTS E
-//    E is a convex, nondegenerate polygon (of at least 3 sides)
+//    E is a convex, nondegenerate cuboidal hexahedron with quadrilateral faces
 //    Polynomials of degree r >= 1
 //    The mesh is conforrming
 //
@@ -35,7 +32,6 @@
 class EllipticPDE {
 private:
   ParameterData* my_param;
-
 
 public:
   EllipticPDE(ParameterData& param_in) : my_param(&param_in) {};

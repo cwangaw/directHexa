@@ -8,3 +8,5 @@ Reader/reader_x86_64.a
 Mesh/mesh_x86_64.a
 directhexa.x86_64
 directhexa_x86_64.a
+test/dsSpaceOut.m
+test/dsSpaceOut.txt

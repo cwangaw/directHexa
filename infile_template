@@ -1,26 +1,29 @@
-test/   	# dirName, output directory (preamble)
+test/   	    # dirName, output directory (preamble)
 
 ### MESH PARAMETERS ###########################################################
 
-d		        # meshType (deviated, or randomly deviated)
-0,1        	# xMin,xMax
-0,1        	# yMin,yMax 
-0,1        	# zMin,zMax 
-6,6,6  	    # nx,ny,nz
-0.1         # distortion factor
+o		          # meshType ('o' = regularly deviated in one direction (x), 
+              #           't' = regularly deviated in two directions (x and z),
+              #           'r' = randomly deviated)
+0,1        	  # xMin,xMax
+0,1        	  # yMin,yMax 
+0,1        	  # zMin,zMax 
+4,4,4  	      # nx,ny,nz
+0.2           # distortion factor
 
 ### FINITE ELEMENTS ###########################################################
 
-1     	        # polynomial degree
-0               # type of supplemental function (0=piecewise polynomial, 1=smooth)
+1     	      # polynomial degree
+0             # type of supplemental function (0=piecewise polynomial with T_D, 1=piecewise polynomial with T_M, 2=smooth)
+0             # refinement level for quadrature
 
 ### OUTPUT PARAMETERS ########################################################
 
-2			          # Output DS solution (-1=omit, 0=none, 1=raw, 2=matlab)
-101,101,101         # numPtsDS_x,numPtsDS_y,numPtsDS_z number of x,y,z points for matlab
+2			        # Output DS solution (-1=omit, 0=none, 1=raw, 2=matlab)
+101,101,101   # numPtsDS_x,numPtsDS_y,numPtsDS_z number of x,y,z points for matlab
 
-2			# Mesh output format (0=none, 1=raw, 2=matlab)
-2			# DS space output format (0=none, 1=raw, 2=matlab)
+2			        # Mesh output format (0=none, 1=raw, 2=matlab)
+2			        # DS space output format (0=none, 1=raw, 2=matlab)
 
 #MONITORING
-2                    	# Monitor code progress to level
+2            # Monitor code progress to level

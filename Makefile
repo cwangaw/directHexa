@@ -6,9 +6,9 @@ include $(HOME)/Config/Make.cf.$(TARG)
 
 PROG = directhexa
 
-SRC = main.cpp parameterData.cpp  \
-         #fcns.cpp polyQuadrature.cpp directSerendipityFE.cpp directSerendipity.cpp ellipticPDE.cpp
-INC = parameterData.h directSerendipity.h ellipticPDE.h # fcns.h polyQuadrature.h
+SRC = main.cpp parameterData.cpp fcns.cpp quadrature.cpp\
+      ellipticPDE.cpp directSerendipityFE.cpp directSerendipity.cpp 
+INC = parameterData.h directSerendipity.h ellipticPDE.h fcns.h quadrature.h
 
 MAIN_MODULE = $(PROG)_$(TARG).a
 OBJ = $(patsubst %.cpp, %.o, $(SRC))

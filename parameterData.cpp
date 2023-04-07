@@ -121,8 +121,6 @@ int ParameterData::writeDSSpace() {
   string fileName = directory_name;
   fileName += "dsSpaceOut";
 
-
-/*
   switch(output_dsSpace_format) {
   case case_dsSpace_output_raw: {
     fileName += ".txt";
@@ -132,12 +130,10 @@ int ParameterData::writeDSSpace() {
   case case_dsSpace_output_matlab: {
     if(dsSpace.write_matlab(fileName)) return ERR_FILESYSTEM;
     break;
-  }
+  }  
   default:
     return ERR_UNSUPPORTED_OPTION;
   }
-
-*/
 
   return 0;
 }
@@ -194,10 +190,10 @@ int ParameterData::read() {
     ERRCHK(readScalar(distortion_factor));
     if(distortion_factor >= 0.5) return processReaderError(ERR_BAD_DATA);
 
-    mesh.set(meshTypeC, nx,ny,nz, xMin,xMax, yMin,yMax, zMin,zMax, distortion_factor);
+    mesh.createMesh(meshTypeC, nx,ny,nz, xMin,xMax, yMin,yMax, zMin,zMax, distortion_factor);
+    
     break;
   }
-
   default:
     return processReaderError(ERR_UNSUPPORTED_OPTION);
   }
@@ -208,10 +204,12 @@ int ParameterData::read() {
   if (polynomial_degree < 0) processReaderError(ERR_BAD_DATA);
 
   ERRCHK(readScalar(supplement_type));
-  if (supplement_type != 0  && supplement_type != 1) processReaderError(ERR_BAD_DATA);
+  if (supplement_type < 0  || supplement_type > 2) processReaderError(ERR_BAD_DATA);
 
-  //dsSpace.set(polynomial_degree, supplement_type, &mesh);
-  
+  ERRCHK(readScalar(refinement_level));
+  if (refinement_level < 0) processReaderError(ERR_BAD_DATA);
+  dsSpace.set(polynomial_degree, supplement_type, &mesh);
+
   // OUTPUT PARAMETERS
 
   // DS

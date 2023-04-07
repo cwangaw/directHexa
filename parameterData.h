@@ -57,7 +57,8 @@ public:
   // FINITE ELEMENTS
   int polynomial_degree;
   int supplement_type;
-  //directserendipity::DirectSerendipity dsSpace;
+  int refinement_level;
+  directserendipity::DirectSerendipity dsSpace;
 
   // OUTPUT PARAMETERS
   int output_soln_DS_format;

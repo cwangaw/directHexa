@@ -1,8 +1,8 @@
 ///////////////////////////////////////////////////////////////////////////////
 //
-//        DIRECT SERENDIPITY AND MIXED FINITE ELEMENTS ON POLYGONS
+//        DIRECT SERENDIPITY FINITE ELEMENTS ON CUBOIDAL HEXAHEDRA
 //
-//  Todd Arbogast <arbogast@ices.utexas.edu>
+//  Todd Arbogast <arbogast@oden.utexas.edu>
 //  Chuning Wang <cwangaw@utexas.edu>
 //
 //  Center for Subsurface Modeling
@@ -10,13 +10,13 @@
 //  The University of Texas at Austin
 //  Austin, Texas  78712
 //
-//  Begun: July 2020
+//  Begun: Feb 2023
 //
 //=============================================================================
 //  EQUATIONS
 //
 //    - div D grad p + div(b p) + c.grad p + a p = f
-//                       in Omega (bounded, connected, Lipschitz domain in R^2)
+//                       in Omega (a rectangular cuboidal domain in R^3)
 //    p = g              on the boundary of Omega
 //    where D is a tensor (matrix), b and c are vectors.
 //
@@ -25,24 +25,9 @@
 //          = (f , q) for all q in DS_{r,0}
 //    where DS_r are the direct serendipity spaces and DS_{r,g} has the
 //      boundary nodes set to g. We use a nodal basis for the space.
-//
-//    For mixed formulation, we ask c=0.    
-//    
-//    Find (u,p,lambda) in V_r^s X W_s X Lambda_r  such that
-//    Setting u = - D grad p + b p,
-//    find (u, p, l) in V^s_r x W_s x L_r (hybrid form) such that
-//      (D^{-1} u , v) - (p , div v) + (D^{-1} b p, v)
-//                  + Sum_E (l , v.nu)_{delta E} = 0 for all v in V^s_r
-//      (div u, q) + (a p, q) = (f , q) for all q in W_s
-//      Sum_E (u.nu , l)_{delta E} = 0 for all l in L_r
-//    where 
-//      V^s_r is the direct sum of V^s_r(E), which is 
-//        a full / reduced direct mixed space on element E for s = r, r - 1
-//      W_s is the direct sum of W_s(E) = \Po_s(E) restriced to each element
-//      L_r is \Po_r(e) restriced to each interior edge e, 0 on boundary edges
 //      
 //  ELEMENTS E
-//    E is a convex, nondegenerate polygon (of at least 3 sides)
+//    E is a convex, nondegenerate cuboidal hexahedron with quadrilateral faces
 //    Polynomials of degree r >= 1
 //    The mesh is conforrming
 //
@@ -53,7 +38,7 @@
 //    the U.S. National Science Foundation.
 //
 //  COPYRIGHT
-//    Copyright (C) 2022 Todd Arbogast and Chuning Wang
+//    Copyright (C) 2023 Todd Arbogast and Chuning Wang
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -72,16 +57,12 @@
 #include <sstream>
 
 #include "debug.h"
-//#include "fcns.h"
+#include "fcns.h"
 #include "Utilities/monitor.h"
 #include "parameterData.h"
 #include "Utilities/version.h"
 #include "Reader/expr.h"
 #include "ellipticPDE.h"
-
-//#include "baseObjects.h"
-//#include "polyMesh.h"
-//#include "directSerendipity.h"
 
 ////////////////////////////////////////////////////////////////////////////////
 // MAIN ROUTINES
@@ -90,7 +71,7 @@
 static void write_header (const Version& code, const ParameterData& param)
 {
   std::cout << "\n";
-  std::cout << "  DIRECT SERENDIPITY AND MIXED FINITE ELEMENTS ON HEXAHEDRA\n\n";
+  std::cout << "  DIRECT SERENDIPITY FINITE ELEMENTS ON CUBOIDAL HEXAHEDRA\n\n";
 
   std::cout << "           Name:       " << code.name << "\n";
   std::cout << "           Version:    " << code.version[0];
@@ -146,7 +127,7 @@ static int parse_flags (int argc, char** argv, ParameterData& param, Version& co
 	    param.print_cases();
 	    return 1;
 	  case 'C':
-	    std::cout << "Copyright (C) 2022 Todd Arbogast and Chuning Wang\n\n";
+	    std::cout << "Copyright (C) 2023 Todd Arbogast and Chuning Wang\n\n";
 	    std::cout << "This program is free software: you can redistribute it and/or modify\n";
 	    std::cout << "it under the terms of the GNU General Public License as published by\n";
 	    std::cout << "the Free Software Foundation, either version 3 of the License, or\n";
@@ -184,7 +165,7 @@ int main(int argc, char* argv[]) {
   // Initialize
   Version code("directhexa","March 2023",3);
   code.set_version(1,0,0);
-  code.set_description("Solves a second order PDE using DS and hybrid mixed spaces on hexahedra\nAllows simple mesh construction");
+  code.set_description("Solves a second order PDE using DS spaces on hexahedra\nAllows simple mesh construction");
 
   ParameterData param;
   Monitor monitor;
@@ -201,8 +182,8 @@ int main(int argc, char* argv[]) {
     if(param.output_soln_DS_format != ParameterData::case_soln_DS_output_omit) {
       monitor (0, "\nBEGIN DS COMPUTATION\n");
 
-      //EllipticPDE ellipticPDE(param);
-      //ellipticPDE.solve(monitor);
+      EllipticPDE ellipticPDE(param);
+      ellipticPDE.solve(monitor);
 
       monitor(0,"\nEND DS COMPUTATION");
     }
