@@ -98,18 +98,8 @@ namespace hexamesh {
     bool good_element;
     HexaMesh* my_mesh = nullptr;
     int* vertex_global_index = nullptr;
-    // double the_volume;
-    Point my_center;  // of largest inscribed ball
-    // Point my_centroid; // center of mass
-    // double my_diameter;
-    double max_radius;
-
-
-
-    //Vertex* my_vertices;
-    // double computeAreaTetra(const Point* px, const Point* py, const Point* pz, const Point* p3);
-    // double computeArea();
-    void potentialCenter(int f0, int f1, int f2, int f3, Point& center, double& radius);
+    std::vector<std::vector<int>> subtetra_d;
+    std::vector<std::vector<int>> subtetra_m;
 
     void set_element(int ix, int iy, int iz, int i, HexaMesh* myMesh=nullptr);
 
@@ -117,8 +107,7 @@ namespace hexamesh {
     Element(int ix, int iy, int iz, int i, HexaMesh* myMesh=nullptr) {
       set_element(ix, iy, iz, i, myMesh); };
     Element() :
-		    my_mesh_pos(), my_mesh_index(), good_element(0), my_mesh(nullptr),
-        my_center(), max_radius(0) {};
+		    my_mesh_pos(), my_mesh_index(), good_element(0), subtetra_d(), subtetra_m() {};
     ~Element();
 
     void set(int ix, int iy, int iz, int i, HexaMesh* myMesh=nullptr) {
@@ -148,6 +137,7 @@ namespace hexamesh {
     Vertex* edgeVertexPtr(bool pm, int i);
     int edgeGlobal(int sgnx, int sgny, int sgnz);
     int edgeGlobal(int i);
+    void edgeFace(int nEdge, int& f0, int& f1);
 
     // Faces
     // (sgnx, sgny, sgnz) = (0,0,-1) -> f_{\hat{z}=-1}
@@ -159,15 +149,10 @@ namespace hexamesh {
     int faceGlobal(int i);
 
     // Partition the element into subtetrahedra
-    std::vector<std::vector<Vertex*>> subtetrahedra(int type);
-    
-    // double volume() const { return the_volume; };
-    Point center()   const { return my_center; };
-    // Point centroid() const { return my_centroid; };
-    double maxRadius() const { return max_radius; }
-    // double diameter() const { return my_diameter; };
+    std::vector<std::vector<int>>* subtetrahedra(int type);
+    bool isInSubtetrahedron(const std::vector<int>& subtetrahedron, const Point& pt);
+    int inSubtetrahedron(const std::vector<std::vector<int>>& subtetrahedra, const Point& pt);
 
-    
     Tensor1 normal(int i); // normal vector of face i
     Tensor1 normal(int sgnx, int sgny, int sgnz) { return normal( faceIndex(sgnx, sgny, sgnz) ); };
 
@@ -175,10 +160,17 @@ namespace hexamesh {
     double lambda(int sgnx, int sgny, int sgnz, double x, double y, double z) {
       return lambda(faceIndex(sgnx, sgny, sgnz), x,y,z); };
     double lambda(int i, const Point& p) { return lambda(i, p[0], p[1], p[2]); };
-    double lambda(int sgnx, int sgny, int sgnz, const Point& p) { return lambda(sgnx, sgny, sgnz, p[1], p[2], p[3]); };
+    double lambda(int sgnx, int sgny, int sgnz, const Point& p) { return lambda(sgnx, sgny, sgnz, p[0], p[1], p[2]); };
+
+    Tensor1 dLambda(int i) { return -1*normal(i); };
+    Tensor1 dLambda(int sgnx, int sgny, int sgnz) { return dLambda(faceIndex(sgnx, sgny, sgnz)); };
     
+    Point forwardMap(const Point& p);
+    Point backwardMap(const Point& p);
+    void dForwardMap(const Point& p, Tensor2& df, double& jac);
+
     bool isInElement(const Point& pt);
-    // bool isOnElementBoundary(const Point& pt) const;
+    
 
     void write_raw(std::ofstream& fout);
     int write_raw(std::string& filename);
@@ -338,9 +330,6 @@ namespace hexamesh {
     // Access the center of face by its position in the array
     Point* faceCenterPtr(int i) { return &face_center[i]; };
     double faceRadius(int i) { return face_radius[i]; };
-    // Access the center of element by its position in the array
-    Point* elementCenterPtr(int i) { return &elementPtr(i)->my_center; };
-    double elementRadius(int i) { return elementPtr(i)->maxRadius(); };
 
     // Return the element containing the point pt
     int inElement(const Point& pt);

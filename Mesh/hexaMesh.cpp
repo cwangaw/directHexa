@@ -66,108 +66,48 @@ void Element::set_element(int ix, int iy, int iz, int i, HexaMesh* myMesh) {
     if ( Tensor1(*faceVertexPtr(1,1,iFace)-*faceVertexPtr(0,0,iFace))*normal(iFace)  > element_eps ) good_element = false;
   }
 
-  // Compute center of largest inscribed circle
-  std::vector<std::vector<int>> possible_face_indices;
-  possible_face_indices.clear();
-  int x_ind[] {0,1}, y_ind[] {2,3}, z_ind[] {4,5};
-  for (auto j:y_ind) {
-    for (auto k:z_ind) { 
-      std::vector<int> face_indices{0,1,j,k,5-j,9-k};
-      possible_face_indices.push_back(face_indices);
-    }
-  }
-
-  for (auto i:x_ind) {
-    for (auto k:z_ind) {
-      std::vector<int> face_indices{2,3,i,k,1-i,9-k};
-      possible_face_indices.push_back(face_indices);      
-    }
-  }
-
-  for (auto i:x_ind) {
-    for (auto j:y_ind) {
-      std::vector<int> face_indices{4,5,i,j,1-i,5-j};
-      possible_face_indices.push_back(face_indices);      
-    }
-  }
-
-  max_radius = 0;
-  std::vector<Point> center_candidates;
-  center_candidates.clear();
-  Point candidate; double new_radius;
-
-  for (unsigned int i=0; i<possible_face_indices.size(); i++) {
-    potentialCenter(possible_face_indices[i][0], possible_face_indices[i][1],
-                    possible_face_indices[i][2], possible_face_indices[i][3],
-                    candidate,new_radius);
-    if (lambda(possible_face_indices[i][4],candidate)+element_eps>=new_radius 
-     && lambda(possible_face_indices[i][5],candidate)+element_eps>=new_radius) {
-      // The sphere is inside the hexahedra
-      if (max_radius < new_radius) {
-        max_radius = new_radius;
-        center_candidates.clear();
-        center_candidates.push_back(candidate);          
-      } else if (std::abs(max_radius-new_radius) < element_eps) {
-        center_candidates.push_back(candidate);
-      }
-    }
-  }
-
-  my_center.set(0,0,0);
-  if(center_candidates.size() == 0) {
-    std::cerr << "ERROR: the element[" << my_mesh_index << "] has no center of the largest inscribed sphere" << std::endl;
+  subtetra_d.clear();
+  if ((my_mesh_pos[0]+my_mesh_pos[1]+my_mesh_pos[2]) % 2 == 0) {
+    // boundary tetra with a vertex at v_{-1,-2,-3}
+    subtetra_d.push_back({vertexIndex(-1,-1,-1), vertexIndex(1,-1,-1), vertexIndex(-1,1,-1), vertexIndex(-1,-1,1)});
+    // boundary tetra with a vertex at v_{-1,2,3}
+    subtetra_d.push_back({vertexIndex(-1,1,1), vertexIndex(1,1,1), vertexIndex(-1,-1,1), vertexIndex(-1,1,-1)});
+    // boundary tetra with a vertex at v_{1,-2,3}
+    subtetra_d.push_back({vertexIndex(1,-1,1), vertexIndex(-1,-1,1), vertexIndex(1,1,1), vertexIndex(1,-1,-1)});
+    // boundary tetra with a vertex at v_{1,2,-3}
+    subtetra_d.push_back({vertexIndex(1,1,-1), vertexIndex(-1,1,-1), vertexIndex(1,-1,-1), vertexIndex(1,1,1)});
+    // center tetra
+    subtetra_d.push_back({vertexIndex(1,1,1), vertexIndex(1,-1,-1), vertexIndex(-1,1,-1),  vertexIndex(-1,-1,1)});
   } else {
-    for(unsigned long int i=0; i<center_candidates.size(); i++) {
-      my_center += center_candidates[i];
-    }
-    my_center /= center_candidates.size();	  
+    // boundary tetra with a vertex at v_{1,2,3}
+    subtetra_d.push_back({vertexIndex(1,1,1), vertexIndex(-1,1,1), vertexIndex(1,-1,1), vertexIndex(1,1,-1)});
+    // boundary tetra with a vertex at v_{1,-2,-3}
+    subtetra_d.push_back({vertexIndex(1,-1,-1), vertexIndex(-1,-1,-1), vertexIndex(1,1,-1), vertexIndex(1,-1,1)});
+    // boundary tetra with a vertex at v_{-1,2,-3}
+    subtetra_d.push_back({vertexIndex(-1,1,-1), vertexIndex(1,1,-1), vertexIndex(-1,-1,-1), vertexIndex(-1,1,1)});
+    // boundary tetra with a vertex at v_{-1,-2,3}
+    subtetra_d.push_back({vertexIndex(-1,-1,1), vertexIndex(1,-1,1), vertexIndex(-1,1,1), vertexIndex(-1,-1,-1)});
+    // center tetra
+    subtetra_d.push_back({vertexIndex(-1,-1,-1), vertexIndex(-1,1,1), vertexIndex(1,-1,1), vertexIndex(1,1,-1)});
   }
+
+  subtetra_m.clear();
+  // T_{1,-2}
+  subtetra_m.push_back({vertexIndex(1,1,1), vertexIndex(-1,-1,-1), vertexIndex(1,-1,-1), vertexIndex(1,-1,1)});
+  // T_{1,-3}
+  subtetra_m.push_back({vertexIndex(1,1,1), vertexIndex(-1,-1,-1), vertexIndex(1,-1,-1), vertexIndex(1,1,-1)});
+  // T_{2,-1}
+  subtetra_m.push_back({vertexIndex(1,1,1), vertexIndex(-1,-1,-1), vertexIndex(-1,1,-1), vertexIndex(-1,1,1)});
+  // T_{2,-3}
+  subtetra_m.push_back({vertexIndex(1,1,1), vertexIndex(-1,-1,-1), vertexIndex(-1,1,-1), vertexIndex(1,1,-1)});        
+  // T_{3,-1}
+  subtetra_m.push_back({vertexIndex(1,1,1), vertexIndex(-1,-1,-1), vertexIndex(-1,-1,1), vertexIndex(-1,1,1)});
+  // T_{3,-2}
+  subtetra_m.push_back({vertexIndex(1,1,1), vertexIndex(-1,-1,-1), vertexIndex(-1,-1,1), vertexIndex(1,-1,1)});     
 }
 
 Element::~Element() {
   if(vertex_global_index) delete[] vertex_global_index;
-}
-
-void Element::potentialCenter(int f0, int f1, int f2, int f3, Point& center, double& radius) {
-  // We rearrange the elements so that f0 and f1 are opposite faces
-  if(!((f0==0 && f1==1) || (f0==2 && f1==3) || (f0==4 && f1==5))) {
-    std::vector<int> face_indices{f0,f1,f2,f3};
-    bool x_op = std::find(face_indices.begin(), face_indices.end(), 0) != face_indices.end() 
-      && std::find(face_indices.begin(), face_indices.end(), 1) != face_indices.end();
-    bool y_op = std::find(face_indices.begin(), face_indices.end(), 2) != face_indices.end() 
-      && std::find(face_indices.begin(), face_indices.end(), 3) != face_indices.end();
-    bool z_op = std::find(face_indices.begin(), face_indices.end(), 4) != face_indices.end() 
-      && std::find(face_indices.begin(), face_indices.end(), 5) != face_indices.end();
-    if (int(x_op)+int(y_op)+int(z_op) != 1) {
-      std::cerr << "ERROR: Meaningless input for the potentialCenter routine" << std::endl;
-      return;
-    } else {
-      std::sort(face_indices.begin(),face_indices.end());
-      if (x_op) { f0=0; f1=1; f2=face_indices[2]; f3=face_indices[3]; }
-      if (y_op) { f0=2; f1=3; f2=face_indices[0]; f3=face_indices[3]; }
-      if (z_op) { f0=4; f1=5; f2=face_indices[0]; f3=face_indices[1]; }
-    }
-  }
-
-  // We find it as the intersection of f02, f12, f23
-  Tensor1 nu_02 = normal(f2) - normal(f0);
-  Tensor1 nu_12 = normal(f2) - normal(f1);
-  Tensor1 nu_23 = normal(f2) - normal(f3);
-
-  Tensor1 pt_02 = *faceVertexPtr(0,0,f2);
-  Tensor1 pt_12 = *faceVertexPtr(1,1,f2);
-  Tensor1 pt_23 = (f3%2)? *faceVertexPtr(1,1,f2) : *faceVertexPtr(0,0,f2);// f3 odd: pm1=1, even: pm1=0
-
-  Tensor2 A(nu_02.val(0),nu_02.val(1),nu_02.val(2), 
-          nu_12.val(0),nu_12.val(1),nu_12.val(2),
-          nu_23.val(0),nu_23.val(1),nu_23.val(2));
-
-  Tensor2 invA;
-
-  (void) A.inverse(invA);
-  center = invA * Tensor1(nu_02*pt_02, nu_12*pt_12, nu_23*pt_23);
-  radius = lambda(f2, center);
-  return;
 }
 
 void Element::vertexPos(int i, int& sgnx, int& sgny, int& sgnz) {
@@ -266,6 +206,22 @@ int Element::edgeGlobal(int sgnx, int sgny, int sgnz) {
   }
 }
 
+void Element::edgeFace(int nEdge, int& f0, int& f1) {
+  int sgnx, sgny, sgnz;
+  edgePos(nEdge, sgnx, sgny, sgnz);
+  if (sgnx==0) {
+    f0 = faceIndex(0,sgny,0);
+    f1 = faceIndex(0,0,sgnz);
+  } else if (sgny==0) {
+    f0 = faceIndex(sgnx,0,0);
+    f1 = faceIndex(0,0,sgnz);
+  } else {
+    f0 = faceIndex(sgnx,0,0);
+    f1 = faceIndex(0,sgny,0);        
+  }
+  return;
+}
+
 int Element::edgeGlobal(int i) {
   int sgnx, sgny, sgnz;
   edgePos(i, sgnx, sgny, sgnz);
@@ -342,99 +298,44 @@ int Element::faceGlobal(int i) {
   return faceGlobal(sgnx, sgny, sgnz);
 }
 
-std::vector<std::vector<Vertex*>> Element::subtetrahedra(int type) {
-  std::vector<std::vector<Vertex*>> vertices; vertices.clear();
+std::vector<std::vector<int>>* Element::subtetrahedra(int type) {
   // type=0 : T_D, type=1 : T_M
   switch(type) {
-    case 0:
-      if ((my_mesh_pos[0]+my_mesh_pos[1]+my_mesh_pos[2]) % 2 == 0) {
-        // boundaty tetra with a vertex at v_{-1,-2,-3}
-        vertices.push_back(std::vector<Vertex*>{my_mesh->vertexPtr(my_mesh_pos[0], my_mesh_pos[1], my_mesh_pos[2]),
-                                                my_mesh->vertexPtr(my_mesh_pos[0]+1, my_mesh_pos[1], my_mesh_pos[2]),
-                                                my_mesh->vertexPtr(my_mesh_pos[0], my_mesh_pos[1]+1, my_mesh_pos[2]),
-                                                my_mesh->vertexPtr(my_mesh_pos[0], my_mesh_pos[1], my_mesh_pos[2]+1)});
-        // boundaty tetra with a vertex at v_{-1,2,3}
-        vertices.push_back(std::vector<Vertex*>{my_mesh->vertexPtr(my_mesh_pos[0], my_mesh_pos[1]+1, my_mesh_pos[2]+1),
-                                                my_mesh->vertexPtr(my_mesh_pos[0]+1, my_mesh_pos[1]+1, my_mesh_pos[2]+1),
-                                                my_mesh->vertexPtr(my_mesh_pos[0], my_mesh_pos[1], my_mesh_pos[2]+1),
-                                                my_mesh->vertexPtr(my_mesh_pos[0], my_mesh_pos[1]+1, my_mesh_pos[2])});
-        // boundaty tetra with a vertex at v_{1,-2,3}
-        vertices.push_back(std::vector<Vertex*>{my_mesh->vertexPtr(my_mesh_pos[0]+1, my_mesh_pos[1], my_mesh_pos[2]+1),
-                                                my_mesh->vertexPtr(my_mesh_pos[0], my_mesh_pos[1], my_mesh_pos[2]+1),
-                                                my_mesh->vertexPtr(my_mesh_pos[0]+1, my_mesh_pos[1]+1, my_mesh_pos[2]+1),
-                                                my_mesh->vertexPtr(my_mesh_pos[0]+1, my_mesh_pos[1], my_mesh_pos[2])});
-        // boundaty tetra with a vertex at v_{1,2,-3}
-        vertices.push_back(std::vector<Vertex*>{my_mesh->vertexPtr(my_mesh_pos[0]+1, my_mesh_pos[1]+1, my_mesh_pos[2]),
-                                                my_mesh->vertexPtr(my_mesh_pos[0], my_mesh_pos[1]+1, my_mesh_pos[2]),
-                                                my_mesh->vertexPtr(my_mesh_pos[0]+1, my_mesh_pos[1], my_mesh_pos[2]),
-                                                my_mesh->vertexPtr(my_mesh_pos[0]+1, my_mesh_pos[1]+1, my_mesh_pos[2])+1});
-        // center tetra
-        vertices.push_back(std::vector<Vertex*>{my_mesh->vertexPtr(my_mesh_pos[0]+1, my_mesh_pos[1]+1, my_mesh_pos[2]+1),
-                                                my_mesh->vertexPtr(my_mesh_pos[0]+1, my_mesh_pos[1], my_mesh_pos[2]),
-                                                my_mesh->vertexPtr(my_mesh_pos[0], my_mesh_pos[1]+1, my_mesh_pos[2]),
-                                                my_mesh->vertexPtr(my_mesh_pos[0], my_mesh_pos[1], my_mesh_pos[2]+1)});
-      } else {
-        // boundaty tetra with a vertex at v_{1,2,3}
-        vertices.push_back(std::vector<Vertex*>{my_mesh->vertexPtr(my_mesh_pos[0]+1, my_mesh_pos[1]+1, my_mesh_pos[2]+1),
-                                                my_mesh->vertexPtr(my_mesh_pos[0], my_mesh_pos[1]+1, my_mesh_pos[2]+1),
-                                                my_mesh->vertexPtr(my_mesh_pos[0]+1, my_mesh_pos[1], my_mesh_pos[2]+1),
-                                                my_mesh->vertexPtr(my_mesh_pos[0]+1, my_mesh_pos[1]+1, my_mesh_pos[2])});
-        // boundaty tetra with a vertex at v_{1,-2,-3}
-        vertices.push_back(std::vector<Vertex*>{my_mesh->vertexPtr(my_mesh_pos[0]+1, my_mesh_pos[1], my_mesh_pos[2]),
-                                                my_mesh->vertexPtr(my_mesh_pos[0], my_mesh_pos[1], my_mesh_pos[2]),
-                                                my_mesh->vertexPtr(my_mesh_pos[0]+1, my_mesh_pos[1]+1, my_mesh_pos[2]),
-                                                my_mesh->vertexPtr(my_mesh_pos[0]+1, my_mesh_pos[1], my_mesh_pos[2]+1)});
-        // boundaty tetra with a vertex at v_{-1,2,-3}
-        vertices.push_back(std::vector<Vertex*>{my_mesh->vertexPtr(my_mesh_pos[0], my_mesh_pos[1]+1, my_mesh_pos[2]),
-                                                my_mesh->vertexPtr(my_mesh_pos[0]+1, my_mesh_pos[1]+1, my_mesh_pos[2]),
-                                                my_mesh->vertexPtr(my_mesh_pos[0], my_mesh_pos[1], my_mesh_pos[2]),
-                                                my_mesh->vertexPtr(my_mesh_pos[0], my_mesh_pos[1]+1, my_mesh_pos[2]+1)});
-        // boundaty tetra with a vertex at v_{-1,-2,3}
-        vertices.push_back(std::vector<Vertex*>{my_mesh->vertexPtr(my_mesh_pos[0], my_mesh_pos[1], my_mesh_pos[2]+1),
-                                                my_mesh->vertexPtr(my_mesh_pos[0]+1, my_mesh_pos[1], my_mesh_pos[2]+1),
-                                                my_mesh->vertexPtr(my_mesh_pos[0], my_mesh_pos[1]+1, my_mesh_pos[2]+1),
-                                                my_mesh->vertexPtr(my_mesh_pos[0], my_mesh_pos[1], my_mesh_pos[2])});
-        // center tetra
-        vertices.push_back(std::vector<Vertex*>{my_mesh->vertexPtr(my_mesh_pos[0], my_mesh_pos[1], my_mesh_pos[2]),
-                                                my_mesh->vertexPtr(my_mesh_pos[0], my_mesh_pos[1]+1, my_mesh_pos[2]+1),
-                                                my_mesh->vertexPtr(my_mesh_pos[0]+1, my_mesh_pos[1], my_mesh_pos[2]+1),
-                                                my_mesh->vertexPtr(my_mesh_pos[0]+1, my_mesh_pos[1]+1, my_mesh_pos[2])});
-      }
-      break;
-    case 1:
-      // T_{1,-2}
-      vertices.push_back(std::vector<Vertex*>{my_mesh->vertexPtr(my_mesh_pos[0]+1, my_mesh_pos[1]+1, my_mesh_pos[2]+1),
-                                              my_mesh->vertexPtr(my_mesh_pos[0], my_mesh_pos[1], my_mesh_pos[2]),
-                                              my_mesh->vertexPtr(my_mesh_pos[0]+1, my_mesh_pos[1], my_mesh_pos[2]),
-                                              my_mesh->vertexPtr(my_mesh_pos[0]+1, my_mesh_pos[1], my_mesh_pos[2]+1)});
-      // T_{1,-3}
-      vertices.push_back(std::vector<Vertex*>{my_mesh->vertexPtr(my_mesh_pos[0]+1, my_mesh_pos[1]+1, my_mesh_pos[2]+1),
-                                              my_mesh->vertexPtr(my_mesh_pos[0], my_mesh_pos[1], my_mesh_pos[2]),
-                                              my_mesh->vertexPtr(my_mesh_pos[0]+1, my_mesh_pos[1], my_mesh_pos[2]),
-                                              my_mesh->vertexPtr(my_mesh_pos[0]+1, my_mesh_pos[1]+1, my_mesh_pos[2])});
-      // T_{2,-1}
-      vertices.push_back(std::vector<Vertex*>{my_mesh->vertexPtr(my_mesh_pos[0]+1, my_mesh_pos[1]+1, my_mesh_pos[2]+1),
-                                              my_mesh->vertexPtr(my_mesh_pos[0], my_mesh_pos[1], my_mesh_pos[2]),
-                                              my_mesh->vertexPtr(my_mesh_pos[0], my_mesh_pos[1]+1, my_mesh_pos[2]),
-                                              my_mesh->vertexPtr(my_mesh_pos[0], my_mesh_pos[1]+1, my_mesh_pos[2]+1)});
-      // T_{2,-3}
-      vertices.push_back(std::vector<Vertex*>{my_mesh->vertexPtr(my_mesh_pos[0]+1, my_mesh_pos[1]+1, my_mesh_pos[2]+1),
-                                              my_mesh->vertexPtr(my_mesh_pos[0], my_mesh_pos[1], my_mesh_pos[2]),
-                                              my_mesh->vertexPtr(my_mesh_pos[0], my_mesh_pos[1]+1, my_mesh_pos[2]),
-                                              my_mesh->vertexPtr(my_mesh_pos[0]+1, my_mesh_pos[1]+1, my_mesh_pos[2])});        
-      // T_{3,-1}
-      vertices.push_back(std::vector<Vertex*>{my_mesh->vertexPtr(my_mesh_pos[0]+1, my_mesh_pos[1]+1, my_mesh_pos[2]+1),
-                                              my_mesh->vertexPtr(my_mesh_pos[0], my_mesh_pos[1], my_mesh_pos[2]),
-                                              my_mesh->vertexPtr(my_mesh_pos[0], my_mesh_pos[1], my_mesh_pos[2]+1),
-                                              my_mesh->vertexPtr(my_mesh_pos[0], my_mesh_pos[1]+1, my_mesh_pos[2]+1)});
-      // T_{3,-2}
-      vertices.push_back(std::vector<Vertex*>{my_mesh->vertexPtr(my_mesh_pos[0]+1, my_mesh_pos[1]+1, my_mesh_pos[2]+1),
-                                              my_mesh->vertexPtr(my_mesh_pos[0], my_mesh_pos[1], my_mesh_pos[2]),
-                                              my_mesh->vertexPtr(my_mesh_pos[0], my_mesh_pos[1], my_mesh_pos[2]+1),
-                                              my_mesh->vertexPtr(my_mesh_pos[0]+1, my_mesh_pos[1], my_mesh_pos[2]+1)});                                                                                                                  
-      break;
-  }  
-  return vertices;
+    case 0: {
+      return &subtetra_d;
+    }
+    case 1: {
+      return &subtetra_m;
+    }
+  }
+}
+
+bool Element::isInSubtetrahedron(const std::vector<int>& subtetrahedron, const Point& pt) {
+  for (int iVertex=0; iVertex<4; iVertex++) {
+    Tensor1 normal = cross(Tensor1(*vertexPtr(subtetrahedron[(iVertex+2)%4])-*vertexPtr(subtetrahedron[(iVertex+1)%4])), 
+                           Tensor1(*vertexPtr(subtetrahedron[(iVertex+3)%4])-*vertexPtr(subtetrahedron[(iVertex+1)%4])));
+      if((Tensor1(*vertexPtr(subtetrahedron[iVertex])-*vertexPtr(subtetrahedron[(iVertex+1)%4]))*normal) 
+       * (Tensor1(pt-*vertexPtr(subtetrahedron[(iVertex+1)%4]))*normal) < -element_eps) return false;
+  }
+  return true;
+}
+
+int Element::inSubtetrahedron(const std::vector<std::vector<int>>& subtetrahedra, const Point& pt) {
+  static int previousSubTetraIndex = 0;
+
+  for(unsigned int i=previousSubTetraIndex; i<subtetrahedra.size(); i++) {
+    if(isInSubtetrahedron(subtetrahedra[i],pt)) {
+      previousSubTetraIndex = i;
+      return i;
+    }
+  }
+  for(unsigned int i=0; i<previousSubTetraIndex; i++) {
+    if(isInSubtetrahedron(subtetrahedra[i],pt)) {
+      previousSubTetraIndex = i;
+      return i;
+    }
+  }
+  return -1;
 }
 
 Tensor1 Element::normal(int i) {
@@ -457,6 +358,56 @@ double Element::lambda(int i, double x, double y, double z) {
         +(faceVertexPtr(0,0,i)->val(2) - z) * normal_vector[2];
 }
 
+Point Element::forwardMap(const Point& p) {
+  return ((double)1/8)*( 
+      *vertexPtr(0)*(1-p(0))*(1-p(1))*(1-p(2)) + *vertexPtr(4)*(1+p(0))*(1-p(1))*(1-p(2)) 
+    + *vertexPtr(2)*(1-p(0))*(1+p(1))*(1-p(2)) + *vertexPtr(6)*(1+p(0))*(1+p(1))*(1-p(2)) 
+    + *vertexPtr(1)*(1-p(0))*(1-p(1))*(1+p(2)) + *vertexPtr(5)*(1+p(0))*(1-p(1))*(1+p(2)) 
+    + *vertexPtr(3)*(1-p(0))*(1+p(1))*(1+p(2)) + *vertexPtr(7)*(1+p(0))*(1+p(1))*(1+p(2))
+    );
+}
+
+Point Element::backwardMap(const Point& p) {
+  double tol = 1e-12;
+  int max_iter = 20;
+
+  Point p_orig((*vertexPtr(0)+*vertexPtr(7))/2); // initial guess
+  Tensor1 resid;
+  for (int k=0; k<max_iter; k++) {
+    resid = forwardMap(p_orig) - p;
+    if (resid.norm() < tol) return;
+    Tensor2 df; double det;
+    dForwardMap(p_orig,df,det);
+    Tensor2 df_inv; df.inverse(df_inv);
+    p_orig = p_orig - df_inv*resid;
+  }
+}
+
+void Element::dForwardMap(const Point& p, Tensor2& df, double& jac) {
+  Tensor1 col[3];
+  col[0] = ((double)1/8)*((-1)*
+    (*vertexPtr(0))*(1-p(1))*(1-p(2)) + *vertexPtr(4)*(1-p(1))*(1-p(2)) 
+    - *vertexPtr(2)*(1+p(1))*(1-p(2)) + *vertexPtr(6)*(1+p(1))*(1-p(2)) 
+    - *vertexPtr(1)*(1-p(1))*(1+p(2)) + *vertexPtr(5)*(1-p(1))*(1+p(2)) 
+    - *vertexPtr(3)*(1+p(1))*(1+p(2)) + *vertexPtr(7)*(1+p(1))*(1+p(2))
+    );
+  col[1] = ((double)1/8)*( (-1)*
+    (*vertexPtr(0))*(1-p(0))*(1-p(2)) - *vertexPtr(4)*(1+p(0))*(1-p(2)) 
+    + *vertexPtr(2)*(1-p(0))*(1-p(2)) + *vertexPtr(6)*(1+p(0))*(1-p(2)) 
+    - *vertexPtr(1)*(1-p(0))*(1+p(2)) - *vertexPtr(5)*(1+p(0))*(1+p(2)) 
+    + *vertexPtr(3)*(1-p(0))*(1+p(2)) + *vertexPtr(7)*(1+p(0))*(1+p(2))
+    );
+  col[2] = ((double)1/8)*( (-1)*
+    (*vertexPtr(0))*(1-p(0))*(1-p(1)) - *vertexPtr(4)*(1+p(0))*(1-p(1))
+    - *vertexPtr(2)*(1-p(0))*(1+p(1)) - *vertexPtr(6)*(1+p(0))*(1+p(1))
+    + *vertexPtr(1)*(1-p(0))*(1-p(1)) + *vertexPtr(5)*(1+p(0))*(1-p(1)) 
+    + *vertexPtr(3)*(1-p(0))*(1+p(1)) + *vertexPtr(7)*(1+p(0))*(1+p(1))
+    );
+
+  df.set(col[0][0],col[1][0],col[2][0],col[0][1],col[1][1],col[2][1],col[0][2],col[1][2],col[2][2]);
+  jac = abs(df.determinant());
+}
+
 bool Element::isInElement(const Point& pt) {
   for(int i=0; i<6; i++) {
     if(lambda(i, pt) < -element_eps) return false;
@@ -466,10 +417,6 @@ bool Element::isInElement(const Point& pt) {
 
 void Element::write_raw(std::ofstream& fout) {
   fout << "  ELEMENT\n";
-  // fout << "  the_volume    = " << the_volume << "\n";
-  fout << "  my_center     = " << my_center << "\n";
-  fout << "  max_radius     = " << max_radius << "\n";
-  // fout << "  my_centroid   = " << my_centroid << "\n";
   fout << "  good_element  = " << good_element << "\n";
   fout << "  my_mesh       = " << my_mesh << "\n";
   fout << "  my_mesh_index       = " << my_mesh_index << "\n";

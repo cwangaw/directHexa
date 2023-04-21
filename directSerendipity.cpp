@@ -302,46 +302,7 @@ void DirectSerendipity::set_directserendipity(int polyDeg, int suppType, HexaMes
       }
     }
   }
-/*
-  // set cell dofs
-  if (num_dofs_per_cell>0) {
-    if (cell_dofs) delete[] cell_dofs;
-    cell_dofs = new Point[num_dofs_per_cell*my_mesh->nElements()];
-    int node_num = 0;
-    int degCellPoly = polynomial_degree-6;
 
-    for (int iElement=0; iElement<my_mesh->nElements(); iElement++) {
-      Point center(*my_mesh->elementCenterPtr(iElement));
-      if (degCellPoly > 0) {
-        double dist = 0.5*my_mesh->elementRadius(iElement);
-
-        Point dx(std::sqrt(double(8)/3)*dist/degCellPoly,0,0);
-        Point dy(std::sqrt(double(2)/3)*dist/degCellPoly,std::sqrt(2)*dist/degCellPoly,0);
-        Point dz(std::sqrt(double(2)/3)*dist/degCellPoly,std::sqrt(2)/3*dist/degCellPoly,(double(4)/3)*dist/degCellPoly);
-
-        Point zBasePoint(-std::sqrt(double(2)/3)*dist,-std::sqrt(2)/3*dist,-(double(1)/3)*dist);
-        zBasePoint += center;
-
-        for (int k=0; k<=degCellPoly; k++) {
-          Point yBasePoint(zBasePoint);
-          for (int j=0; j<=degCellPoly-k; j++) {
-            Point nodePoint(yBasePoint);
-            for (int i=0; i<=degCellPoly-k-j; i++) {
-              cell_dofs[node_num] = nodePoint;
-              nodePoint += dx;
-              node_num++;              
-            }
-            yBasePoint += dy;
-          }
-          zBasePoint += dz;
-        }
-      } else {
-        // Just take the center to be the only face dof
-        cell_dofs[iElement] = center;
-      }
-    }
-  }
-*/  
   // ALLOCATE ELEMENTS
   if(the_ds_elements) delete[] the_ds_elements;
   the_ds_elements = new DirectSerendipityFE[my_mesh->nElements()];
@@ -352,7 +313,6 @@ void DirectSerendipity::set_directserendipity(int polyDeg, int suppType, HexaMes
 
 DirectSerendipity::~DirectSerendipity() {
   if (face_dofs) delete[] face_dofs;
-//  if (cell_dofs) delete[] cell_dofs;
   if (the_ds_elements) delete[] the_ds_elements;
 };
 
@@ -375,15 +335,6 @@ void DirectSerendipity::write_raw(std::ofstream& fout) const {
       fout << "\t\tDoF[" << iDoF << "]: (" << face_dofs[iFace*nSingleFaceDoFs()+iDoF] << ")\n";
     }
   }
-/*
-  fout << "\ncell dofs:\n";
-  for (int iElement=0; iElement<my_mesh->nElements(); iElement++) {
-    fout << "\telement[" << iElement << "]\n";
-    for (int iDoF=0; iDoF<nSingleCellDoFs(); iDoF++) {
-      fout << "\t\tDoF[" << iDoF << "]: (" << cell_dofs[iElement*nSingleCellDoFs()+iDoF] << ")\n";
-    }
-  }
-*/
 }
 
 int DirectSerendipity::write_raw(std::string& filename) const {
@@ -488,24 +439,6 @@ int DirectSerendipity::write_matlab(std::string& filename) const {
     fout << "],'sb','filled')\n";
 
   }
-/*
-  // Cell nodes
-  if (num_dofs_per_cell>0) {
-    fout << "scatter3([ ";
-    for(int i=0; i<num_dofs_per_cell*my_mesh->nElements(); i++) {
-      fout << cell_dofs[i][0] << " ";
-    }
-    fout << "],[ ";
-    for(int i=0; i<num_dofs_per_cell*my_mesh->nElements(); i++) {
-      fout << cell_dofs[i][1] << " ";
-    }
-    fout << "],[ ";
-    for(int i=0; i<num_dofs_per_cell*my_mesh->nElements(); i++) {
-      fout << cell_dofs[i][2] << " ";
-    }
-    fout << "],'^r','filled')\n";
-  }
-*/
 
   // CENTERS
 
@@ -523,21 +456,6 @@ int DirectSerendipity::write_matlab(std::string& filename) const {
     fout << my_mesh->faceCenterPtr(i)->val(2) << " ";
   }
   fout << "],'ok')\n";
-
-  // Element centers
-  fout << "scatter3([ ";
-  for(int i=0; i<my_mesh->nElements(); i++) {
-    fout << my_mesh->elementPtr(i)->center()[0] << " ";
-  }
-  fout << "],[ ";
-  for(int i=0; i<my_mesh->nElements(); i++) {
-    fout << my_mesh->elementPtr(i)->center()[1] << " ";
-  }
-  fout << "],[ ";
-  for(int i=0; i<my_mesh->nElements(); i++) {
-    fout << my_mesh->elementPtr(i)->center()[2] << " ";
-  }
-  fout << "],'*g')\n";
 
   fout << "hold off;\n";
   return 0;

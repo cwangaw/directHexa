@@ -91,6 +91,17 @@ namespace directserendipity {
     int num_cell_dofs; // Redundant with above
     int num_dofs; // Redundant with above
 
+    // coefficients for face shape functions varphi_{n,s} to form 
+    // a linear combination to serve as nodal basis functions
+    double* face_basis_coefficients = nullptr;
+
+    
+    // coefficients for edge shape functions varphi_{n,s} to form 
+    // a linear combination to serve as the expected function on each edge
+    std::vector<double>* edgevarpahi_eval_mat_inv = nullptr;
+    double* edge_basis_coefficients = nullptr;
+    Point* edge_nodes = nullptr;
+
     // Evaluation storage
     int num_eval_pts;
     double* value_n = nullptr;
@@ -99,6 +110,18 @@ namespace directserendipity {
     // If necessary (degPolyn small), the bigger space within which we construct the basis
     hexamesh::HexaMesh* one_element_mesh = nullptr;
     DirectSerendipity* high_order_ds_space = nullptr;
+
+    void getAB(int n, int m, int iEdge, double& A, double& B);
+    // The varphi functions
+    void faceVarphi(int n, int s, const Point& pt, double& value, Tensor1& gradvalue);
+    void edgeVarphi(int n, int s, const Point& pt, double& value, Tensor1& gradvalue);
+    // The expected value on each edge - bubble*chebyshev
+    double edgeCheby(int n, int s, const Point& pt);
+    // Special function, piecewise linear or rational, dir=0,1,2 correspond to x,y,z
+    void specFunc(int dir, const Point& pt, double& value, Tensor1& gradvalue);
+    void edgePsi(int dir, const Point& pt, double& value, Tensor1& gradvalue);
+  
+   
 
     void set_directserendipityfe(DirectSerendipity* dsSpace, hexamesh::Element* element);
 
@@ -191,7 +214,7 @@ namespace directserendipity {
     int num_dofs_per_cell;
 
     Point* face_dofs = nullptr;
-  //  Point* cell_dofs = nullptr;
+
     DirectSerendipityFE* the_ds_elements = nullptr;
 
     void set_directserendipity(int polyDeg, int suppType, hexamesh::HexaMesh* mesh);
@@ -218,7 +241,7 @@ namespace directserendipity {
     int nCellDoFs() const { return my_mesh->nElements() * nSingleCellDoFs(); };
 
     DirectSerendipityFE* finiteElementPtr(int i) const { return &the_ds_elements[i]; }
-
+    Point* faceDoFPtr(int nFace, int iDoF) const { return &face_dofs[nFace*num_dofs_per_face+iDoF]; }
     void write_raw(std::ofstream& fout) const;
     int write_raw(std::string& filename) const;
 

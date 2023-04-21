@@ -35,7 +35,7 @@ void Quadrature::set_element(int supplement_type, int refinement_level, hexamesh
   my_element = element;
   if(!element) return;
 
-  std::vector<std::vector<Point>> tetrahedra = refine(refinement_level, my_element->subtetrahedra(std::min(1,supplement_type)));
+  std::vector<std::vector<Point>> tetrahedra = refine(refinement_level, *my_element->subtetrahedra(std::min(1,supplement_type)));
 
   int num_tetrahedra = tetrahedra.size();
   num_pts = num_tetrahedra*num_pts_ref;
@@ -68,13 +68,13 @@ void Quadrature::set_element(int supplement_type, int refinement_level, hexamesh
 } 
 
 
-std::vector<std::vector<Point>> Quadrature::refine(int level, std::vector<std::vector<hexamesh::Vertex*>> vertices) {
+std::vector<std::vector<Point>> Quadrature::refine(int level, const std::vector<std::vector<int>>& vertices) {
   std::vector<std::vector<Point>> my_vertices; my_vertices.clear();
 
   for (unsigned int iTetra = 0; iTetra < vertices.size(); iTetra++) {
     std::vector<Point> this_tetra(4);
     for (int i = 0; i < 4; i++) {
-      this_tetra[i].set(*(vertices[iTetra][i]));
+      this_tetra[i].set(*my_element->vertexPtr(vertices[iTetra][i]));
     }
     my_vertices.push_back(this_tetra);
   }

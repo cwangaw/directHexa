@@ -282,7 +282,7 @@ namespace quadrature {
 
     void set_rule(int desired_dop);
     void set_element(int supplement_type, int refinement_level, hexamesh::Element* element);
-    std::vector<std::vector<Point>> refine(int level, std::vector<std::vector<hexamesh::Vertex*>> vertices); 
+    std::vector<std::vector<Point>> refine(int level, const std::vector<std::vector<int>>& vertices); 
   
     public:
     Quadrature(int desired_dop=2, int supplement_type=0, int refinement_level = 0, hexamesh::Element* element=nullptr) {
