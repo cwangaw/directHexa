@@ -4,7 +4,7 @@
 
 #include <stdio.h>
 #include <assert.h>
-
+#include "lapacke.h"
 
 using namespace std;
 
@@ -15,6 +15,14 @@ using namespace hexamesh;
 using namespace directserendipity;
 #include "quadrature.h"
 using namespace quadrature;
+
+// fact
+int fact(int n) {
+   if (n == 0 || n == 1)
+   return 1;
+   else
+   return n * fact(n - 1);
+}
 
 ////////////////////////////////////////////////////////////////////////////////
 // class DirectSerendipityArray
@@ -32,9 +40,10 @@ DirectSerendipityArray::~DirectSerendipityArray() {
 }
 
 void DirectSerendipityArray::eval(const Point* pts, double* result,
-				  Tensor1* gradResult, int num_pts) const { 
+				  Tensor1* gradResult, int num_pts) const {
   bool ptEvaluated[num_pts];
   for(int i=0; i<num_pts; i++) ptEvaluated[i] = false;
+
 
   // Loop through the elements
   std::vector<Point> elementPts;
@@ -257,6 +266,134 @@ int DirectSerendipityArray::write_raw(std::string& filename) const {
   return 0;
 }
 
+void DirectSerendipityArray::write_tecplot_mesh(std::ofstream* fout, std::ofstream* fout_grad,
+					       int num_pts_x, int num_pts_y, int num_pts_z) const {
+  if(num_pts_x <= 1) num_pts_x = 2;
+  if(num_pts_y <= 1) num_pts_y = 2;
+  if(num_pts_z <= 1) num_pts_z = 2;
+
+  // Determine mesh of points
+  double xMin = my_ds_space->my_mesh->xMin();
+  double xMax = my_ds_space->my_mesh->xMax();
+  double yMin = my_ds_space->my_mesh->yMin();
+  double yMax = my_ds_space->my_mesh->yMax();
+  double zMin = my_ds_space->my_mesh->zMin();
+  double zMax = my_ds_space->my_mesh->zMax();
+
+  double dx = (xMax - xMin)/(num_pts_x-1);
+  double dy = (yMax - yMin)/(num_pts_y-1);
+  double dz = (zMax - zMin)/(num_pts_z-1);
+
+  Point* pts = new Point[num_pts_x*num_pts_y*num_pts_z];
+  Point* vertices = new Point[my_ds_space->mesh()->nVertices()];
+  
+  for(int i=0; i<num_pts_x; i++) {
+    for(int j=0; j<num_pts_y; j++) {
+      for (int k=0; k<num_pts_z; k++) {
+        pts[k + num_pts_z*j + num_pts_z*num_pts_y*i].set(xMin+i*dx, yMin+j*dy, zMin+k*dz);
+      }
+    }
+  }
+
+  for(int i=0; i<my_ds_space->mesh()->nVertices(); i++) {
+    vertices[i] = *my_ds_space->mesh()->vertexPtr(i);
+  }
+
+  // Evaluate
+  double result[num_pts_x*num_pts_y*num_pts_z];
+  double vertexResult[my_ds_space->mesh()->nVertices()];
+  Tensor1* gradResult = new Tensor1[num_pts_x*num_pts_y*num_pts_z];
+  Tensor1* vertexGradResult = new Tensor1[my_ds_space->mesh()->nVertices()];
+  eval(pts, result, gradResult, num_pts_x*num_pts_y*num_pts_z);
+  eval(vertices, vertexResult, vertexGradResult, my_ds_space->mesh()->nVertices());
+
+  // Write file  
+  *fout << "TITLE = \"Direct serendipity array output\"\n";
+  *fout << "VARIABLES = \"X\", \"Y\", \"Z\", \"value\"\n";
+  *fout << "ZONE I=" << num_pts_x << ", J=" << num_pts_y << ", K=" << num_pts_z << ", DATAPACKING=POINT\n";
+
+  if(fout_grad) {
+    *fout_grad << "TITLE = \"Direct serendipity array output\"\n";
+    *fout_grad << "VARIABLES = \"X\", \"Y\", \"Z\", \"gradvalue[x]\", \"gradvalue[y]\", \"gradvalue[z]\"\n";
+    *fout_grad << "ZONE I=" << num_pts_x << ", J=" << num_pts_y << ", K=" << num_pts_z << ", DATAPACKING=POINT\n";
+  }
+
+  for(int i=0; i<num_pts_x; i++) {
+    for(int j=0; j<num_pts_y; j++) {
+      for (int k=0; k<num_pts_z; k++) {
+        int ind = k + num_pts_z*j + num_pts_z*num_pts_y*i;
+        *fout << pts[ind][0] << " " << pts[ind][1] << " " << pts[ind][2] << " " << result[ind] << "\n";
+        if(fout_grad) *fout_grad << pts[ind][0] << " " << pts[ind][1] << " " << pts[ind][2] << " " << gradResult[ind][0] << " " << gradResult[ind][1] << " " << gradResult[ind][2] << "\n";
+      }
+    }
+  }
+
+  *fout << "ZONE NODES=" << my_ds_space->mesh()->nVertices() << ", ELEMENTS=" << my_ds_space->mesh()->nElements() << ", DATAPACKING=BLOCK, ZONETYPE=FEBRICK\n";
+
+  for(int i=0; i<my_ds_space->mesh()->nVertices(); i++) {
+    *fout << my_ds_space->mesh()->vertexPtr(i)->val(0) << " ";
+    if(fout_grad) *fout_grad << my_ds_space->mesh()->vertexPtr(i)->val(0) << " ";
+  }
+  *fout << "\n";
+  if(fout_grad) *fout_grad << "\n";
+
+  for(int i=0; i<my_ds_space->mesh()->nVertices(); i++) {
+    *fout << my_ds_space->mesh()->vertexPtr(i)->val(1) << " ";
+    if(fout_grad) *fout_grad << my_ds_space->mesh()->vertexPtr(i)->val(1) << " ";
+  }
+  *fout << "\n";
+  if(fout_grad) *fout_grad << "\n";
+
+  for(int i=0; i<my_ds_space->mesh()->nVertices(); i++) {
+    *fout << my_ds_space->mesh()->vertexPtr(i)->val(2) << " ";
+    if(fout_grad) *fout_grad << my_ds_space->mesh()->vertexPtr(i)->val(2) << " ";
+  }
+  *fout <<  "\n";
+  if(fout_grad) *fout_grad << "\n";
+
+  for(int i=0; i<my_ds_space->mesh()->nVertices(); i++) {
+    *fout << vertexResult[i] << " ";
+  }
+  *fout <<  "\n";
+  if(fout_grad) *fout_grad << "\n";
+
+  for (int n=0; n<my_ds_space->mesh()->nElements(); n++) {
+    Element* the_element = my_ds_space->mesh()->elementPtr(n);
+    *fout << the_element->vertexGlobal(4)+1 << " " << the_element->vertexGlobal(6)+1 << " " << the_element->vertexGlobal(2)+1 << " " << the_element->vertexGlobal(0)+1 << " "
+          << the_element->vertexGlobal(5)+1 << " " << the_element->vertexGlobal(7)+1 << " " << the_element->vertexGlobal(3)+1 << " " << the_element->vertexGlobal(1)+1 << " ";
+    *fout << "\n";
+    if(fout_grad) {
+    *fout_grad << the_element->vertexGlobal(4)+1 << " " << the_element->vertexGlobal(6)+1 << " " << the_element->vertexGlobal(2)+1 << " " << the_element->vertexGlobal(0)+1 << " "
+               << the_element->vertexGlobal(5)+1 << " " << the_element->vertexGlobal(7)+1 << " " << the_element->vertexGlobal(3)+1 << " " << the_element->vertexGlobal(1)+1 << " ";
+    *fout_grad << "\n";
+    }
+  }
+
+  delete[] gradResult;
+  delete[] vertexGradResult;
+  delete[] pts;
+  delete[] vertices;
+};
+
+int DirectSerendipityArray::write_tecplot_mesh(std::string& filename, std::string& filename_grad,
+					      int num_pts_x, int num_pts_y, int num_pts_z) const {
+  std::ofstream fout(filename+".dat");
+  if( !fout ) return 1;
+  std::ofstream fout_grad(filename_grad+".dat");
+  if( !fout_grad ) return 1;
+  write_tecplot_mesh(&fout, &fout_grad, num_pts_x, num_pts_y, num_pts_z);
+  return 0;
+}
+
+int DirectSerendipityArray::write_tecplot_mesh(std::string& filename,
+					      int num_pts_x, int num_pts_y, int num_pts_z) const {
+  std::ofstream fout(filename+".dat");
+  if( !fout ) return 1;
+  write_tecplot_mesh(&fout, nullptr, num_pts_x, num_pts_y, num_pts_z);
+  return 0;
+}
+
+
 void DirectSerendipity::set_directserendipity(int polyDeg, int suppType, HexaMesh* mesh) {
   polynomial_degree = polyDeg;
   supplement_type = suppType;
@@ -303,18 +440,195 @@ void DirectSerendipity::set_directserendipity(int polyDeg, int suppType, HexaMes
     }
   }
 
+  // Define and assemble edge_cheby
+  if(edge_cheby) delete[] edge_cheby;
+  edge_cheby = new double[my_mesh->nEdges() * (polynomial_degree-1) * (polynomial_degree-1)];
+
+  for (int iEdge=0; iEdge<my_mesh->nEdges(); iEdge++) {
+      Vertex* v0 = my_mesh->edgeVertexPtr(0,iEdge);
+      Vertex* v1 = my_mesh->edgeVertexPtr(1,iEdge);
+      Tensor1 tangent(*v1-*v0);
+      double length = tangent.norm();
+      tangent /= length;
+    for (int nPt=0; nPt<polynomial_degree-1; nPt++) {
+      Point pt(*v0 + (nPt+1)*length*tangent/polynomial_degree);
+      for (int s=0; s<polynomial_degree-1; s++) {
+        double x = Tensor1(pt-(*v0+*v1)/2)*tangent;
+
+        double value=0;
+        for (int t=0; t<=floor(s/2); t++) {
+          value += fact(s)/fact(2*t)/fact(s-2*t) * pow(4*x*x/length/length-1,t) * pow(2*x/length,s-2*t);
+        }
+        value *= Tensor1(pt-*v0)*Tensor1(*v1-pt);
+        edge_cheby[iEdge*(polynomial_degree-1)*(polynomial_degree-1) + nPt*(polynomial_degree-1) + s] = value / pow(length/2,2);
+      }
+    }
+  }
+
   // ALLOCATE ELEMENTS
+
   if(the_ds_elements) delete[] the_ds_elements;
   the_ds_elements = new DirectSerendipityFE[my_mesh->nElements()];
   for(int iElement=0; iElement<my_mesh->nElements(); iElement++) { 
     the_ds_elements[iElement].set(this, my_mesh->elementPtr(iElement));
+  }
+
+  // store if the dof is on the boundary
+  if (is_interior) delete[] is_interior;
+  is_interior = new bool[num_dofs];
+  int index = 0;
+
+  // store the edge indices on the boundary
+  if (bc_edge_index) delete[] bc_edge_index;
+  bc_edge_index = new int[2*(mesh->xElements()+mesh->yElements())*mesh->zElements() + 2*(mesh->xElements()+mesh->zElements())*mesh->yElements() + 2*(mesh->yElements()+mesh->zElements())*mesh->xElements()];
+  int bc_index = 0;
+
+  // vertex DoFs
+  for (int i=0; i<mesh->nVertices(); i++) {
+    int vertex_pos[3];
+    mesh->vertexPos(i,vertex_pos[0],vertex_pos[1],vertex_pos[2]);
+    is_interior[index] = true;
+    if (vertex_pos[0] == 0 || vertex_pos[0] == mesh->xElements()) is_interior[index] = false;
+    if (vertex_pos[1] == 0 || vertex_pos[1] == mesh->yElements()) is_interior[index] = false;
+    if (vertex_pos[2] == 0 || vertex_pos[2] == mesh->zElements()) is_interior[index] = false;
+    index++;
+  }
+
+  // edge DoFs
+  if (polynomial_degree>1) {
+    for (int i=0; i<mesh->nEdges(); i++) {
+      bool edge_is_interior = true;
+      if (i<(mesh->xElements()+1)*(mesh->yElements()+1)*mesh->zElements()) {
+        // z-dir edges
+        int ix = mesh->edgeVertexPtr(0,i)->meshPos(0);
+        int iy = mesh->edgeVertexPtr(0,i)->meshPos(1);
+        if (ix == 0 || ix == mesh->xElements()) edge_is_interior = false;
+        if (iy == 0 || iy == mesh->yElements()) edge_is_interior = false;
+      } else if (i<(mesh->xElements()+1)*(mesh->yElements()+1)*mesh->zElements()+(mesh->xElements()+1)*mesh->yElements()*(mesh->zElements()+1)) {
+        // y-dir edges
+        int ix = mesh->edgeVertexPtr(0,i)->meshPos(0);
+        int iz = mesh->edgeVertexPtr(0,i)->meshPos(2);
+        if (ix == 0 || ix == mesh->xElements()) edge_is_interior = false;
+        if (iz == 0 || iz == mesh->zElements()) edge_is_interior = false;
+      } else {
+        // x-dir edges
+        int iy = mesh->edgeVertexPtr(0,i)->meshPos(1);
+        int iz = mesh->edgeVertexPtr(0,i)->meshPos(2);
+        if (iy == 0 || iy == mesh->yElements()) edge_is_interior = false;
+        if (iz == 0 || iz == mesh->zElements()) edge_is_interior = false;
+      }
+
+      if (!edge_is_interior) {
+        bc_edge_index[bc_index] = i;
+        bc_index++;
+      }
+
+      for (int jDoF=0; jDoF<polynomial_degree-1; jDoF++) {
+        is_interior[index] = edge_is_interior;
+        index++;
+      }
+    }
+  }
+
+
+  // face DoFs
+  if (num_dofs_per_face>0) {
+    for (int i=0; i<mesh->nFaces(); i++) {
+      bool face_is_interior = true;
+      if (i < (mesh->xElements()+1)*mesh->yElements()*mesh->zElements()) {
+        // yz-dir faces
+        int ix = mesh->faceVertexPtr(0,0,i)->meshPos(0);
+        if (ix == 0 || ix == mesh->xElements()) face_is_interior = false;
+      } else if (i < (mesh->xElements()+1)*mesh->yElements()*mesh->zElements()+mesh->xElements()*(mesh->yElements()+1)*mesh->zElements()) {
+        // xz-dir faces
+        int iy = mesh->faceVertexPtr(0,0,i)->meshPos(1);
+        if (iy == 0 || iy == mesh->yElements()) face_is_interior = false;
+      } else {
+        // xy - dir faces
+        int iz = mesh->faceVertexPtr(0,0,i)->meshPos(2);
+        if (iz == 0 || iz == mesh->zElements()) face_is_interior = false;
+      }
+      for (int jDoF=0; jDoF<num_dofs_per_face; jDoF++) {
+        is_interior[index] = face_is_interior;
+        index++;
+      }
+    }
+  }
+
+  // cell DoFs
+  if (num_dofs_per_cell>0) {
+    for (int i=0; i<mesh->nElements(); i++) {
+      is_interior[index] = true;
+      index++;      
+    }
   }
 }
 
 DirectSerendipity::~DirectSerendipity() {
   if (face_dofs) delete[] face_dofs;
   if (the_ds_elements) delete[] the_ds_elements;
+  if (is_interior) delete[] is_interior;
+  if (edge_cheby) delete[] edge_cheby;
+  if (bc_edge_index) delete[] bc_edge_index;
 };
+
+void DirectSerendipity::bcModification(double* bc_vals) {
+  int num_bc_vertices = 2 + 2*my_mesh->xElements()*my_mesh->yElements() + 2*my_mesh->xElements()*my_mesh->zElements() + 2*my_mesh->yElements()*my_mesh->zElements();
+  int num_bc_edges = 2*(my_mesh->xElements()+my_mesh->yElements())*my_mesh->zElements() + 2*(my_mesh->xElements()+my_mesh->zElements())*my_mesh->yElements() + 2*(my_mesh->yElements()+my_mesh->zElements())*my_mesh->xElements();
+
+  // vertex index mapping
+  int ind = 0;
+  int index_mapping[my_mesh->nVertices()];
+
+  for (int i=0; i<my_mesh->nVertices(); i++) {
+    if (!isInterior(i)) {
+      // on boundary
+      index_mapping[i] = ind;
+      ind++;
+    } else {
+      // interior
+      index_mapping[i] = -1;
+    }
+  }
+
+  for (int iEdge=0; iEdge<num_bc_edges; iEdge++) {
+    int real_index = bc_edge_index[iEdge];
+    int starting_dof = num_bc_vertices + iEdge * (degPolyn()-1);
+
+    double eval_v0 = bc_vals[index_mapping[my_mesh->edgeVertexPtr(0,real_index)->meshIndex()]];
+    double eval_v1 = bc_vals[index_mapping[my_mesh->edgeVertexPtr(1,real_index)->meshIndex()]];
+
+    std::vector<double> A_vec((degPolyn()-1)*(degPolyn()-1),0);
+    double* A = A_vec.data();
+
+    std::vector<double> rhs_vec((degPolyn()-1)*(degPolyn()-1),0);
+    double* rhs = rhs_vec.data();
+
+    
+    for (int iRow=0; iRow<degPolyn()-1; iRow++) {
+      rhs[iRow] = bc_vals[starting_dof+iRow] - (eval_v0 * (1-(double)(iRow+1)/degPolyn()) + eval_v1 * (double)(iRow+1)/degPolyn());
+      for (int jCol=0; jCol<degPolyn()-1; jCol++) {
+        A[iRow*(degPolyn()-1)+jCol] = edgeCheby(real_index, iRow, jCol);
+      }        
+    }
+
+    lapack_int* ipiv; char norm = 'I'; 
+    ipiv = (lapack_int*)malloc((degPolyn()-1) * sizeof(lapack_int));
+    double anorm = LAPACKE_dlange(LAPACK_ROW_MAJOR, norm, degPolyn()-1, degPolyn()-1, A, degPolyn()-1);
+    int ierr = LAPACKE_dgesv(LAPACK_ROW_MAJOR, degPolyn()-1, 1, A, degPolyn()-1, ipiv, rhs, 1); //mat updated to be LU
+    if(ierr) { // ?? what should we do ???
+      std::cerr << "ERROR: Lapack failed with code " << ierr << std::endl; 
+    }
+    double rcond = 0;
+    ierr = LAPACKE_dgecon(LAPACK_ROW_MAJOR, norm, degPolyn()-1, A, degPolyn()-1, anorm, &rcond);
+
+    for (int i=0; i<degPolyn()-1; i++) {
+      bc_vals[starting_dof+i] = rhs[i];
+    }
+  }
+
+  return;
+}
 
 void DirectSerendipity::write_raw(std::ofstream& fout) const {
   fout << "DIRECT SERENDIPITY SPACE\n";

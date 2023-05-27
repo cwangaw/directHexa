@@ -10,6 +10,7 @@ using namespace std;
 
 // Coefficients
 static const double PI = 3.141592653589793238462643383279502884197169399375105820974944;
+int n=2, m=1, l=1;
 
 double coefA(double x, double y, double z) {
   return 0;
@@ -53,17 +54,32 @@ bool trueSolnKnown() { return true; }
 
 // Real solution
 double trueSoln(double x, double y, double z) {
-  return sin(PI*x)*sin(PI*y)*sin(PI*z);
+  return pow(x,n)*pow(y,m)*pow(z,l);
+  ///sin(PI*x)*sin(PI*y)*sin(PI*z);
 }
 
 Tensor1 trueGradSoln(double x, double y, double z) {
-  return Tensor1(PI*cos(PI*x)*sin(PI*y)*sin(PI*z),
-                 PI*sin(PI*x)*cos(PI*y)*sin(PI*z),
-                 PI*sin(PI*x)*sin(PI*y)*cos(PI*z));
+  double dx = (n==0)? 0 : n*pow(x,n-1)*pow(y,m)*pow(z,l);
+  double dy = (m==0)? 0 : m*pow(x,n)*pow(y,m-1)*pow(z,l);
+  double dz = (l==0)? 0 : l*pow(x,n)*pow(y,m)*pow(z,l-1);
+  return Tensor1(dx,dy,dz);
+  //Tensor1(PI*cos(PI*x)*sin(PI*y)*sin(PI*z),
+  //               PI*sin(PI*x)*cos(PI*y)*sin(PI*z),
+  //               PI*sin(PI*x)*sin(PI*y)*cos(PI*z));
 }
 
 Tensor2 trueHessianSoln(double x, double y, double z) {
-  return Tensor2(-PI*PI*sin(PI*x)*sin(PI*y)*sin(PI*z),  PI*PI*cos(PI*x)*cos(PI*y)*sin(PI*z),  PI*PI*cos(PI*x)*sin(PI*y)*cos(PI*z),
-                  PI*PI*cos(PI*x)*cos(PI*y)*sin(PI*z), -PI*PI*sin(PI*x)*sin(PI*y)*sin(PI*z),  PI*PI*sin(PI*x)*cos(PI*y)*cos(PI*z),
-                  PI*PI*cos(PI*x)*sin(PI*y)*cos(PI*z),  PI*PI*sin(PI*x)*cos(PI*y)*cos(PI*z), -PI*PI*sin(PI*x)*sin(PI*y)*sin(PI*z));
+  double dx2 = (n<=1)? 0 : n*(n-1)*pow(x,n-2)*pow(y,m)*pow(z,l);
+  double dy2 = (m<=1)? 0 : m*(m-1)*pow(x,n)*pow(y,m-2)*pow(z,l);
+  double dz2 = (l<=1)? 0 : l*(l-1)*pow(x,n)*pow(y,m)*pow(z,l-2);
+  double dxdy = (n==0 || m==0)? 0 : n*m*pow(x,n-1)*pow(y,m-1)*pow(z,l);
+  double dxdz = (n==0 || l==0)? 0 : n*l*pow(x,n-1)*pow(y,m)*pow(z,l-1);
+  double dydz = (m==0 || l==0)? 0 : m*l*pow(x,n)*pow(y,m-1)*pow(z,l-1);
+
+  return Tensor2(dx2,dxdy,dxdz,
+                 dxdy,dy2,dydz,
+                 dxdz,dydz,dz2);
+  //return Tensor2(-PI*PI*sin(PI*x)*sin(PI*y)*sin(PI*z),  PI*PI*cos(PI*x)*cos(PI*y)*sin(PI*z),  PI*PI*cos(PI*x)*sin(PI*y)*cos(PI*z),
+  //                PI*PI*cos(PI*x)*cos(PI*y)*sin(PI*z), -PI*PI*sin(PI*x)*sin(PI*y)*sin(PI*z),  PI*PI*sin(PI*x)*cos(PI*y)*cos(PI*z),
+  //                PI*PI*cos(PI*x)*sin(PI*y)*cos(PI*z),  PI*PI*sin(PI*x)*cos(PI*y)*cos(PI*z), -PI*PI*sin(PI*x)*sin(PI*y)*sin(PI*z));
 }

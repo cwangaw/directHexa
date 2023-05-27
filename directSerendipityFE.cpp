@@ -38,14 +38,6 @@ lapack_int mat_inv(double *A, int n)
   return ret;
 }
 
-// fact
-int fact(int n) {
-   if (n == 0 || n == 1)
-   return 1;
-   else
-   return n * fact(n - 1);
-}
-
 ////////////////////////////////////////////////////////////////////////////////
 // Class DirectSerendipityFE
 
@@ -99,10 +91,10 @@ void DirectSerendipityFE::set_directserendipityfe(DirectSerendipity* dsSpace, El
   if (polynomial_degree>=3) {
     if (edge_basis_coefficients) delete edge_basis_coefficients;
     edge_basis_coefficients = new double[12*(polynomial_degree-1)*(polynomial_degree-1)];
-    if (edgevarpahi_eval_mat_inv) delete edgevarpahi_eval_mat_inv;
-    edgevarpahi_eval_mat_inv = new std::vector<double>[12];    
+    if (edgecheby_eval_mat_inv) delete edgecheby_eval_mat_inv;
+    edgecheby_eval_mat_inv = new std::vector<double>[12];    
     if (edge_nodes) delete[] edge_nodes;
-    edge_nodes = new Point[12*(polynomial_degree-11)];
+    edge_nodes = new Point[12*(polynomial_degree-1)];
 
     for (int nEdge=0; nEdge<12; nEdge++) {
       std::vector<double> A_vec((polynomial_degree-1)*(polynomial_degree-1),0);
@@ -119,21 +111,20 @@ void DirectSerendipityFE::set_directserendipityfe(DirectSerendipity* dsSpace, El
       Tensor1 tangent(*v1-*v0);
       double seg = tangent.norm()/polynomial_degree;
       tangent /= tangent.norm();
-
       for (int iRow=0; iRow<polynomial_degree-1; iRow++) {
         Point pt = *v0 + (iRow+1)*seg*tangent;
         edge_nodes[nEdge*(polynomial_degree-1)+iRow] = pt;
+        
         for (int jCol=0; jCol<polynomial_degree-1; jCol++) {
           double value; Tensor1 gradvalue;
           edgeVarphi(nEdge, jCol, pt, value, gradvalue);
           A[iRow*(polynomial_degree-1)+jCol] = value;
-          B[iRow*(polynomial_degree-1)+jCol] = edgeCheby(nEdge, jCol, pt);
+          B[iRow*(polynomial_degree-1)+jCol] = edgeCheby(nEdge, iRow, jCol);
         }        
       }
-      (void) mat_inv(A,polynomial_degree-1);
-      edgevarpahi_eval_mat_inv[nEdge]=A_vec;
 
       // coeff = A^{-1}*B
+      (void) mat_inv(A,polynomial_degree-1);
       cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, polynomial_degree-1, polynomial_degree-1,
               polynomial_degree-1, 1, A, polynomial_degree-1, B, polynomial_degree-1,
               0, coeff, polynomial_degree-1);
@@ -142,10 +133,14 @@ void DirectSerendipityFE::set_directserendipityfe(DirectSerendipity* dsSpace, El
           edge_basis_coefficients[nEdge*(polynomial_degree-1)*(polynomial_degree-1)+iFunc*(polynomial_degree-1)+jCoeff] = coeff[jCoeff*(polynomial_degree-1)+iFunc];
         }
       }
+
+      (void) mat_inv(B,polynomial_degree-1);
+      edgecheby_eval_mat_inv[nEdge]=B_vec;
     }
     
   }
 }
+
 
 DirectSerendipityFE::~DirectSerendipityFE() {
   if (high_order_ds_space) delete high_order_ds_space;
@@ -153,7 +148,7 @@ DirectSerendipityFE::~DirectSerendipityFE() {
   if (face_basis_coefficients) delete[] face_basis_coefficients;
   if (edge_basis_coefficients) delete[] edge_basis_coefficients;
   if (edge_nodes) delete[] edge_nodes;
-  if (edgevarpahi_eval_mat_inv) delete[] edgevarpahi_eval_mat_inv;
+  if (edgecheby_eval_mat_inv) delete[] edgecheby_eval_mat_inv;
   if (value_n) delete[] value_n;
   if (gradvalue_n) delete[] gradvalue_n;
 }
@@ -169,17 +164,17 @@ void DirectSerendipityFE::getAB(int n, int m, int iEdge, double& A, double& B) {
 void DirectSerendipityFE::faceVarphi(int n, int s, const Point& pt, double& value, Tensor1& gradvalue) {
   int s0 = ceil(0.5*(2*deg_face_poly+3-sqrt((2*deg_face_poly+3)*(2*deg_face_poly+3)-8*(s+1))))-1;
   int s1 = s - 0.5*(2*deg_face_poly+3-s0)*s0;
-  
+
   n = n%6;
-  int n_opposite, dir, n0, n1;
+  int n_opposite=0, dir=0, n0=0, n1=0;
   if (n==0 || n==1) { dir=0; n_opposite=1-n; n0=2; n1=4; }
   if (n==2 || n==3) { dir=1; n_opposite=5-n; n0=0; n1=4; }
   if (n==4 || n==5) { dir=2; n_opposite=9-n; n0=0; n1=2; }
 
   
-  int common = pow(my_element->lambda(n0, pt),s0) * pow(my_element->lambda(n1, pt),s1);
-  Tensor1 gradvalue = s0 * pow(my_element->lambda(n0, pt),s0-1) * pow(my_element->lambda(n1, pt),s1) * my_element->dLambda(n0)
-                    + s1 * pow(my_element->lambda(n0, pt),s0) * pow(my_element->lambda(n1, pt),s1-1) * my_element->dLambda(n1);
+  double common = pow(my_element->lambda(n0, pt),s0) * pow(my_element->lambda(n1, pt),s1);
+  gradvalue = (s0==0)? Tensor1(0,0,0) : s0 * pow(my_element->lambda(n0, pt),s0-1) * pow(my_element->lambda(n1, pt),s1) * my_element->dLambda(n0);
+  gradvalue += (s1==0)? Tensor1(0,0,0) : s1 * pow(my_element->lambda(n0, pt),s0) * pow(my_element->lambda(n1, pt),s1-1) * my_element->dLambda(n1);
   for (int nFace=0; nFace<6; nFace++) {
     if (nFace==n || nFace==n_opposite) continue;
     common *= my_element->lambda(nFace, pt);
@@ -195,7 +190,7 @@ void DirectSerendipityFE::faceVarphi(int n, int s, const Point& pt, double& valu
     }
     gradvalue += dL;
   }
-
+  
   if (s0+s1<deg_face_poly) {
     value = common*my_element->lambda(n_opposite, pt);
     gradvalue *= my_element->lambda(n_opposite, pt);
@@ -205,7 +200,7 @@ void DirectSerendipityFE::faceVarphi(int n, int s, const Point& pt, double& valu
     Tensor1 specfunc_gradvalue;
     specFunc(dir,pt,specfunc_value,specfunc_gradvalue);
     value = (n%2==0)? 0.5*common*(1-specfunc_value) : 0.5*common*(1+specfunc_value);
-    gradvalue *= (n%2==0)? 0.5*common*(1-specfunc_value) : 0.5*common*(1+specfunc_value);
+    gradvalue *= (n%2==0)? 0.5*(1-specfunc_value) : 0.5*(1+specfunc_value);
     gradvalue += (n%2==0)? -0.5*common*specfunc_gradvalue : 0.5*common*specfunc_gradvalue;
   }
   return;
@@ -219,7 +214,7 @@ void DirectSerendipityFE::edgeVarphi(int n, int s, const Point& pt, double& valu
 
   if (s<=polynomial_degree-4) {
     value = pow(my_element->lambda(f_neg,pt),s);
-    gradvalue = s*pow(my_element->lambda(f_neg,pt),s-1)*my_element->dLambda(f_neg);
+    gradvalue = (s==0)? Tensor1(0,0,0) : s*pow(my_element->lambda(f_neg,pt),s-1)*my_element->dLambda(f_neg);
     for (int nFace=0; nFace<6; nFace++) {
       if (nFace==f0 || nFace==f1) continue;
       value *= my_element->lambda(nFace,pt);
@@ -308,23 +303,8 @@ void DirectSerendipityFE::edgeVarphi(int n, int s, const Point& pt, double& valu
   }
 }
 
-double DirectSerendipityFE::edgeCheby(int n, int s, const Point& pt){
-  assert(s<=polynomial_degree-2);
-  Vertex* v0 = my_element->edgeVertexPtr(0,n);
-  Vertex* v1 = my_element->edgeVertexPtr(1,n);
-
-  Tensor1 tangent(*v1-*v0);
-  double length = tangent.norm();
-  tangent /= length;
-  double x = Tensor1(pt-(*v0+*v1)/2)*tangent;
-
-  double value=0;
-  for (int t=0; t<floor(s/2); t++) {
-    value += fact(n)/fact(2*t)/fact(n-2*t) * pow(4*x*x/length/length-1,t) * pow(2*x/length,n-2*t);
-  }
-  value *= Tensor1(pt-*v0)*Tensor1(*v1-pt); //Bubble
-
-  return value;
+double DirectSerendipityFE::edgeCheby(int iEdge, int nPt, int s) {
+  return my_ds_space->edgeCheby(my_element->edgeGlobal(iEdge), nPt, s);
 }
 
 void DirectSerendipityFE::specFunc(int dir, const Point& pt, double& value, Tensor1& gradvalue) {
@@ -409,8 +389,8 @@ void DirectSerendipityFE::edgePsi(int dir, const Point& pt, double& value, Tenso
     int iEdge = 4*(2-dir)+3;
     double R0, R1; Tensor1 gradR0, gradR1;
     double A0, B0, A1, B1;
-    getAB((dir+2)%3*2,dir,iEdge,A0,B0);
-    getAB((dir+1)%3*2,dir,iEdge,A1,B1);
+    getAB((dir+2)%3*2,dir*2,iEdge,A0,B0);
+    getAB((dir+1)%3*2,dir*2,iEdge,A1,B1);
 
     for (int iV=0; iV<4; iV++) {
       int sgn[3];
@@ -447,13 +427,13 @@ void DirectSerendipityFE::edgePsi(int dir, const Point& pt, double& value, Tenso
                               Tensor1(*my_element->vertexPtr((*subtetra)[tetra][(iV+3)%4]) - *my_element->vertexPtr((*subtetra)[tetra][(iV+1)%4])));
       normal /= normal.norm();
       double scaling = Tensor1(*my_element->vertexPtr((*subtetra)[tetra][iV])-*my_element->vertexPtr((*subtetra)[tetra][(iV+1)%4]))*normal;
-      if ( scaling<0 ) { normal *= -1; scaling *= -1; } 
+      if ( scaling<0 ) { normal *= -1; scaling *= -1; }
       scaling *= 0.5*scaling;
       Point midpt = (*my_element->vertexPtr((*subtetra)[tetra][iV])+*my_element->vertexPtr((*subtetra)[tetra][(iV+1)%4]))/2;
       value += eval[iV] * (Tensor1(pt-*my_element->vertexPtr((*subtetra)[tetra][(iV+1)%4]))*normal) 
                         * (Tensor1(pt-midpt)*normal) / scaling;
       gradvalue += eval[iV] * ((Tensor1(pt-*my_element->vertexPtr((*subtetra)[tetra][(iV+1)%4]))*normal) * normal
-                              + normal*(Tensor1(pt-midpt)*normal)) / scaling; 
+                              + normal*(Tensor1(pt-midpt)*normal)) / scaling;
     }
 
     int ind=3;
@@ -534,8 +514,8 @@ void DirectSerendipityFE::edgePsi(int dir, const Point& pt, double& value, Tenso
     specFunc((dir+2)%3,pt,R0,gradR0);
     specFunc((dir+1)%3,pt,R1,gradR1);
 
-    getAB((dir+2)%3*2,dir,iEdge,A0,B0);
-    getAB((dir+1)%3*2,dir,iEdge,A1,B1);
+    getAB((dir+2)%3*2,dir*2,iEdge,A0,B0);
+    getAB((dir+1)%3*2,dir*2,iEdge,A1,B1);
 
     double psi0 = (my_element->lambda((dir+2)%3*2,eval_p0)-0.5*B0*my_element->lambda(dir*2,eval_p0)*(1+R0))/A0;
     double psi1 = (my_element->lambda((dir+1)%3*2,eval_p1)-0.5*B1*my_element->lambda(dir*2,eval_p1)*(1+R1))/A1;
@@ -547,13 +527,14 @@ void DirectSerendipityFE::edgePsi(int dir, const Point& pt, double& value, Tenso
     break;
   }
   default: return;
-  }	   
+  }
   return;
 }
 
 void DirectSerendipityFE::initBasis(const Point* pt, int num_pts) {
   if(num_pts <= 0) return;
   num_eval_pts = num_pts;
+
 
   // Allocate space for the resulting values
   int sizeOfArray = num_pts * num_dofs;
@@ -562,7 +543,6 @@ void DirectSerendipityFE::initBasis(const Point* pt, int num_pts) {
   value_n = new double[sizeOfArray];
   if (gradvalue_n) delete[] gradvalue_n;
   gradvalue_n = new Tensor1[sizeOfArray];  
-  return;
 
   if (polynomial_degree < 3) {
     // Define DS_1 and DS_2 as subspaces of DS_3 
@@ -582,15 +562,14 @@ void DirectSerendipityFE::initBasis(const Point* pt, int num_pts) {
       for (int nEdge = 0; nEdge < 12; nEdge++) {
           for (int pt_index = 0; pt_index < num_pts; pt_index++) {
             // We directly take higher order edge basis functions that are quadratic on each edge
-            value_n[pt_index*nDoFs()+nVertexDoFs()+nEdge] = high_order_ds_space->finiteElementPtr(0)->edgeBasis(0,pt_index);
-            gradvalue_n[pt_index*nDoFs()+nVertexDoFs()+nEdge] = high_order_ds_space->finiteElementPtr(0)->gradEdgeBasis(0,pt_index);
+            value_n[pt_index*nDoFs()+nVertexDoFs()+nEdge] = high_order_ds_space->finiteElementPtr(0)->edgeBasis(2*nEdge,pt_index);
+            gradvalue_n[pt_index*nDoFs()+nVertexDoFs()+nEdge] = high_order_ds_space->finiteElementPtr(0)->gradEdgeBasis(2*nEdge,pt_index);
           }
       }  
     }
   } else {
     // Cell Basis Functions
     if (num_cell_dofs>0) {
-      double lambda_x, lambda_y, lambda_z;
       int iCellDoF = 0;
       for (int n=0; n<=deg_cell_poly; n++) {
         for (int m=0; m<=deg_cell_poly-n; m++) {
@@ -634,20 +613,17 @@ void DirectSerendipityFE::initBasis(const Point* pt, int num_pts) {
               value += face_basis_coefficients[nFace*num_face_dofs*num_face_dofs/36+iFunc*num_face_dofs/6+jCoeff] * value_varphi;
               gradvalue += face_basis_coefficients[nFace*num_face_dofs*num_face_dofs/36+iFunc*num_face_dofs/6+jCoeff] * gradvalue_varphi;
             }
-
             value_n[pt_index*nDoFs()+nVertexDoFs()+nEdgeDoFs()+ nFace*num_face_dofs/6+iFunc] = value;
             gradvalue_n[pt_index*nDoFs()+nVertexDoFs()+nEdgeDoFs()+ nFace*num_face_dofs/6+iFunc] = gradvalue;
           }
         }
       }
     }
-
     // Edge Basis Functions
     for (int nEdge=0; nEdge<12; nEdge++) {
       // Find out the two faces containing this edge
       int f_index[2];
       my_element->edgeFace(nEdge, f_index[0], f_index[1]);
-
 
       for (int iFunc=0; iFunc<polynomial_degree-1; iFunc++) {
         // If num_face_dofs>0, first evaluate the edge basis functions at 
@@ -658,7 +634,7 @@ void DirectSerendipityFE::initBasis(const Point* pt, int num_pts) {
         if (num_face_dofs>0) {
           for (int n=0; n<2; n++) {
             for (int iDoF=0; iDoF<num_face_dofs/6; iDoF++) {
-              Point* node=my_ds_space->faceDoFPtr(f_index[n],iDoF);
+              Point* node=my_ds_space->faceDoFPtr(my_element->faceGlobal(f_index[n]),iDoF);
               double value=0; 
               Tensor1 gradvalue(0,0,0);
             
@@ -671,7 +647,6 @@ void DirectSerendipityFE::initBasis(const Point* pt, int num_pts) {
             }          
           }
         }
-
         for (int pt_index = 0; pt_index < num_pts; pt_index++) {
           double value=0; 
           Tensor1 gradvalue(0,0,0);
@@ -693,7 +668,7 @@ void DirectSerendipityFE::initBasis(const Point* pt, int num_pts) {
           }
 
           value_n[pt_index*nDoFs()+nVertexDoFs()+nEdge*(polynomial_degree-1)+iFunc] = value;
-          gradvalue_n[pt_index*nDoFs()+nVertexDoFs()+nEdge*(polynomial_degree-1)+iFunc] = gradvalue;       
+          gradvalue_n[pt_index*nDoFs()+nVertexDoFs()+nEdge*(polynomial_degree-1)+iFunc] = gradvalue;   
         }
       }
     }
@@ -722,7 +697,7 @@ void DirectSerendipityFE::initBasis(const Point* pt, int num_pts) {
       if (num_face_dofs>0) {
         for (int n=0; n<3; n++) {
           for (int iDoF=0; iDoF<num_face_dofs/6; iDoF++) {
-            Point* node=my_ds_space->faceDoFPtr(f_connect[n],iDoF);
+            Point* node=my_ds_space->faceDoFPtr(my_element->faceGlobal(f_connect[n]),iDoF);
             eval_face_nodes.push_back( my_element->lambda(fx_neg,*node)*my_element->lambda(fy_neg,*node)*my_element->lambda(fz_neg,*node) / scaling_factor );
           }          
         }
@@ -741,12 +716,12 @@ void DirectSerendipityFE::initBasis(const Point* pt, int num_pts) {
         double* coeff =coeff_vec.data();
 
         for (int iRow=0; iRow<polynomial_degree-1; iRow++) {
-          expected_value[iRow] = (v_index[2-n]<0)? 1-(double)(iRow+1)/polynomial_degree : (double)(iRow+1)/polynomial_degree;
+          expected_value[iRow] = (v_index[2-n]<0)? 1-(double)(iRow+1)/polynomial_degree : (double)(iRow+1)/polynomial_degree;        
           expected_value[iRow] -= my_element->lambda(fx_neg,edge_nodes[nEdge*(polynomial_degree-1)+iRow])*my_element->lambda(fy_neg,edge_nodes[nEdge*(polynomial_degree-1)+iRow])*my_element->lambda(fz_neg,edge_nodes[nEdge*(polynomial_degree-1)+iRow]) / scaling_factor;
         }
 
         cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, polynomial_degree-1, 1,
-              polynomial_degree-1, 1, edgevarpahi_eval_mat_inv[nEdge].data(), polynomial_degree-1, expected_value, 1,
+              polynomial_degree-1, 1, edgecheby_eval_mat_inv[nEdge].data(), polynomial_degree-1, expected_value, 1,
               0, coeff, 1);
         normalization_coeffs[n] = coeff_vec;
       }
@@ -757,7 +732,7 @@ void DirectSerendipityFE::initBasis(const Point* pt, int num_pts) {
                           + my_element->lambda(fx_neg,pt[pt_index]) * my_element->dLambda(fy_neg) * my_element->lambda(fz_neg,pt[pt_index])
                           + my_element->lambda(fx_neg,pt[pt_index]) * my_element->lambda(fy_neg,pt[pt_index]) * my_element->dLambda(fz_neg);
         gradvalue /= scaling_factor;
-        
+
         // eliminate face dofs
         if (num_face_dofs>0) {
           for (int n=0; n<3; n++) {
@@ -771,14 +746,13 @@ void DirectSerendipityFE::initBasis(const Point* pt, int num_pts) {
         // linearize on the edges
         for (int n=0; n<3; n++) { 
           for (int iDoF=0; iDoF<polynomial_degree-1; iDoF++) {
-            value -= normalization_coeffs[n][iDoF] * value_n[pt_index*nDoFs()+nVertexDoFs()+e_connect[n]*(polynomial_degree-1)+iDoF];
-            gradvalue -= normalization_coeffs[n][iDoF] * gradvalue_n[pt_index*nDoFs()+nVertexDoFs()+e_connect[n]*(polynomial_degree-1)+iDoF];
+            value += normalization_coeffs[n][iDoF] * value_n[pt_index*nDoFs()+nVertexDoFs()+e_connect[n]*(polynomial_degree-1)+iDoF];
+            gradvalue += normalization_coeffs[n][iDoF] * gradvalue_n[pt_index*nDoFs()+nVertexDoFs()+e_connect[n]*(polynomial_degree-1)+iDoF];
           }
         }
-
         value_n[pt_index*nDoFs()+nVertex] = value;
         gradvalue_n[pt_index*nDoFs()+nVertex] = gradvalue;
-      }
+      }   
     }
   }
 }
@@ -856,5 +830,146 @@ int DirectSerendipityFE::write_raw(std::string& filename) const {
   std::ofstream fout(filename);
   if( !fout ) return 1;
   write_raw(fout);
+  return 0;
+}
+
+void DirectSerendipityFE::write_tecplot(std::ofstream* fout, std::ofstream* fout_grad,
+        int num_pts_x, int num_pts_y, int num_pts_z,
+        double* vertex_dofs, double* edge_dofs, double* face_dofs, double* cell_dofs) {
+  if(num_pts_x <= 1) num_pts_x = 2;
+  if(num_pts_y <= 1) num_pts_y = 2;
+  if(num_pts_z <= 1) num_pts_z = 2;
+
+  // Determine mesh of points
+  double x_min=my_element->vertexPtr(0)->val(0);
+  double x_max=x_min;
+  double y_min=my_element->vertexPtr(0)->val(1);
+  double y_max=y_min;
+  double z_min=my_element->vertexPtr(0)->val(2); 
+  double z_max=z_min;
+
+  for (int iVertex=1; iVertex<8; iVertex++) {
+    if (my_element->vertexPtr(iVertex)->val(0) < x_min) x_min = my_element->vertexPtr(iVertex)->val(0);
+    if (my_element->vertexPtr(iVertex)->val(1) < y_min) y_min = my_element->vertexPtr(iVertex)->val(1);
+    if (my_element->vertexPtr(iVertex)->val(2) < z_min) z_min = my_element->vertexPtr(iVertex)->val(2);
+    if (my_element->vertexPtr(iVertex)->val(0) > x_max) x_max = my_element->vertexPtr(iVertex)->val(0);
+    if (my_element->vertexPtr(iVertex)->val(1) > y_max) y_max = my_element->vertexPtr(iVertex)->val(1);
+    if (my_element->vertexPtr(iVertex)->val(2) > z_max) z_max = my_element->vertexPtr(iVertex)->val(2);
+  }
+
+  double dx = (x_max - x_min)/(num_pts_x-1);
+  double dy = (y_max - y_min)/(num_pts_y-1);
+  double dz = (z_max - z_min)/(num_pts_z-1);
+
+  Point* pts = new Point[num_pts_x*num_pts_y*num_pts_z];
+  Point* vertices = new Point[8];
+
+  for(int i=0; i<num_pts_x; i++) {
+    for(int j=0; j<num_pts_y; j++) {
+      for (int k=0; k<num_pts_z; k++) {
+        pts[k + num_pts_z*j + num_pts_z*num_pts_y*i].set(x_min+i*dx, y_min+j*dy, z_min+k*dz);
+      }
+    }
+  }
+
+  for(int i=0; i<8; i++) {
+    vertices[i] = *my_element->vertexPtr(i);
+  }
+
+  // Evaluate
+  double result[num_pts_x*num_pts_y*num_pts_z];
+  double vertexResult[8];
+  Tensor1* gradResult = new Tensor1[num_pts_x*num_pts_y*num_pts_z];
+  Tensor1* vertexGradResult = new Tensor1[8];
+  eval(pts, result, gradResult, num_pts_x*num_pts_y*num_pts_z, vertex_dofs, edge_dofs, face_dofs, cell_dofs);
+  eval(vertices, vertexResult, vertexGradResult, 8, vertex_dofs, edge_dofs, face_dofs, cell_dofs);
+
+  // Modify the evaluation of the points outside the element to be zero
+  for(int i=0; i<num_pts_x; i++) {
+    for(int j=0; j<num_pts_y; j++) {
+      for (int k=0; k<num_pts_z; k++) {
+        if (!my_element->isInElement(pts[k + num_pts_z*j + num_pts_z*num_pts_y*i])) {
+          result[k + num_pts_z*j + num_pts_z*num_pts_y*i] = 0;
+          gradResult[k + num_pts_z*j + num_pts_z*num_pts_y*i].set(0,0,0);
+        }
+      }
+    }
+  }  
+
+  // Write file  
+  *fout << "TITLE = \"Direct serendipity array output\"\n";
+  *fout << "VARIABLES = \"X\", \"Y\", \"Z\", \"value\"\n";
+  *fout << "ZONE I=" << num_pts_x << ", J=" << num_pts_y << ", K=" << num_pts_z << ", DATAPACKING=POINT\n";
+
+  if(fout_grad) {
+    *fout_grad << "TITLE = \"Direct serendipity array output\"\n";
+    *fout_grad << "VARIABLES = \"X\", \"Y\", \"Z\", \"gradvalue[1]\", \"gradvalue[2]\"\n";
+    *fout_grad << "ZONE I=" << num_pts_x << ", J=" << num_pts_y << ", K=" << num_pts_z << ", DATAPACKING=POINT\n";
+  }
+
+  for(int i=0; i<num_pts_x; i++) {
+    for(int j=0; j<num_pts_y; j++) {
+      for (int k=0; k<num_pts_z; k++) {
+        int ind = k + num_pts_z*j + num_pts_z*num_pts_y*i;
+        *fout << pts[ind][0] << " " << pts[ind][1] << " " << pts[ind][2] << " " << result[ind] << "\n";
+        if(fout_grad) *fout_grad << pts[ind][0] << " " << pts[ind][1] << " " << pts[ind][2] << " " << gradResult[ind][0] << " " << gradResult[ind][1] << "\n";
+      }
+    }
+  }
+
+
+  *fout << "ZONE NODES=" << 8 << ", ELEMENTS=" << 1 << ", DATAPACKING=BLOCK, ZONETYPE=FEBRICK\n";
+  for(int i=0; i<8; i++) {
+    *fout <<my_element->vertexPtr(i)->val(0) << " ";
+    if(fout_grad) *fout_grad << my_element->vertexPtr(i)->val(0) << " ";
+  }
+  *fout << "\n";
+  if(fout_grad) *fout_grad << "\n";
+
+  for(int i=0; i<8; i++) {
+    *fout << my_element->vertexPtr(i)->val(1) << " ";
+    if(fout_grad) *fout_grad << my_element->vertexPtr(i)->val(1) << " ";
+  }
+  *fout << "\n";
+  if(fout_grad) *fout_grad << "\n";
+
+  for(int i=0; i<8; i++) {
+    *fout << my_element->vertexPtr(i)->val(2) << " ";
+    if(fout_grad) *fout_grad << my_element->vertexPtr(i)->val(2) << " ";
+  }
+  *fout <<  "\n";
+  if(fout_grad) *fout_grad << "\n";
+
+  for(int i=0; i<8; i++) {
+    *fout << vertexResult[i] << " ";
+  }
+  *fout <<  "\n";
+  if(fout_grad) *fout_grad << "\n";
+
+
+  *fout << my_element->vertexGlobal(4) << " " << my_element->vertexGlobal(6) << " " << my_element->vertexGlobal(2) << " " << my_element->vertexGlobal(0) << " "
+        << my_element->vertexGlobal(5) << " " << my_element->vertexGlobal(7) << " " << my_element->vertexGlobal(3) << " " << my_element->vertexGlobal(1) << " ";
+  *fout << "\n";
+  if(fout_grad) {
+  *fout_grad << my_element->vertexGlobal(4) << " " << my_element->vertexGlobal(6) << " " << my_element->vertexGlobal(2) << " " << my_element->vertexGlobal(0) << " "
+              << my_element->vertexGlobal(5) << " " << my_element->vertexGlobal(7) << " " << my_element->vertexGlobal(3) << " " << my_element->vertexGlobal(1) << " ";
+  *fout_grad << "\n";
+  }
+
+
+  delete[] gradResult;
+  delete[] vertexGradResult;
+  delete[] pts;
+  delete[] vertices;
+}
+
+int DirectSerendipityFE::write_tecplot(std::string& filename, std::string& filename_grad,
+        int num_pts_x, int num_pts_y, int num_pts_z,
+        double* vertex_dofs, double* edge_dofs, double* face_dofs, double* cell_dofs) {
+  std::ofstream fout(filename+".dat");
+  if( !fout ) return 1;
+  std::ofstream fout_grad(filename_grad+".dat");
+  if( !fout_grad ) return 1;
+  write_tecplot(&fout, &fout_grad, num_pts_x, num_pts_y, num_pts_z, vertex_dofs, edge_dofs, face_dofs, cell_dofs);
   return 0;
 }

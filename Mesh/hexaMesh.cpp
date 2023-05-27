@@ -196,7 +196,7 @@ int Element::edgeGlobal(int sgnx, int sgny, int sgnz) {
     int base = (mesh()->xElements()+1) * (mesh()->yElements()+1) * mesh()->zElements() + (mesh()->xElements()+1) * mesh()->yElements() * (mesh()->zElements()+1);
     return base + v0->meshPos(1) * mesh()->xElements() * (mesh()->zElements()+1) +  v0->meshPos(2) * mesh()->xElements() + v0->meshPos(0);
   } else if (sgny == 0) {
-    int base = (mesh()->xElements()+1) * mesh()->yElements() * (mesh()->zElements()+1);
+    int base = (mesh()->xElements()+1) * (mesh()->yElements()+1) * mesh()->zElements();
     return base + v0->meshPos(0) * mesh()->yElements() * (mesh()->zElements()+1) + v0->meshPos(2) * mesh()->yElements() + v0->meshPos(1);
   } else if (sgnz == 0) {
     return v0->meshPos(0) * mesh()->zElements() * (mesh()->yElements()+1) + v0->meshPos(1) * mesh()->zElements() +  v0->meshPos(2);
@@ -307,6 +307,7 @@ std::vector<std::vector<int>>* Element::subtetrahedra(int type) {
     case 1: {
       return &subtetra_m;
     }
+    default: return &subtetra_m;
   }
 }
 
@@ -329,7 +330,7 @@ int Element::inSubtetrahedron(const std::vector<std::vector<int>>& subtetrahedra
       return i;
     }
   }
-  for(unsigned int i=0; i<previousSubTetraIndex; i++) {
+  for(int i=0; i<previousSubTetraIndex; i++) {
     if(isInSubtetrahedron(subtetrahedra[i],pt)) {
       previousSubTetraIndex = i;
       return i;
@@ -375,12 +376,13 @@ Point Element::backwardMap(const Point& p) {
   Tensor1 resid;
   for (int k=0; k<max_iter; k++) {
     resid = forwardMap(p_orig) - p;
-    if (resid.norm() < tol) return;
+    if (resid.norm() < tol) return p_orig;
     Tensor2 df; double det;
     dForwardMap(p_orig,df,det);
     Tensor2 df_inv; df.inverse(df_inv);
     p_orig = p_orig - df_inv*resid;
   }
+  return p_orig;
 }
 
 void Element::dForwardMap(const Point& p, Tensor2& df, double& jac) {
@@ -697,28 +699,76 @@ int HexaMesh::elementIndex(int ix, int iy, int iz) const {
   return ix*num_y*num_z + iy*num_z + iz;
 }
 
-  // Faces: The indexing of the edges are started with yz-dir faces (with index priority z -> y -> x),
-  //                                       followed by xz-dir faces (with index priority z -> x -> y),
-  //                                       followed by xy-dir faces (with index priority y -> x -> z)
-  //
-  //        yz-dir faces (locally f_{\pm 1}) with v_00 (the left-bottom-back corner vertex):
-  //           (0,0,0) -> (0,0,1) -> ... -> (0,0,nz-1) 
-  //        -> (0,1,0) -> (0,1,1) -> ... -> (0,1,nz-1) -> ... -> (0,ny-1,nz-1)
-  //        -> (1,0,0) -> (1,0,1) -> ... -> (1,0,nz-1)
-  //        -> (1,1,0) -> (1,1,1) -> ... -> (1,1,nz-1) -> ... -> (1,ny-1,nz-1) -> ... -> (nx,ny-1,nz-1)
-  //
-  //        xz-dir faces (locally f_{\pm 2}) with v_00 (the left-bottom-back corner vertex):
-  //           (0,0,0) -> (0,0,1) -> ... -> (0,0,nz-1) 
-  //        -> (1,0,0) -> (1,0,1) -> ... -> (1,0,nz-1) -> ... -> (nx-1,0,nz-1)
-  //        -> (0,1,0) -> (0,1,1) -> ... -> (0,1,nz-1)
-  //        -> (1,1,0) -> (1,1,1) -> ... -> (1,1,nz-1) -> ... -> (nx-1,1,nz-1) -> ... ->  (nx-1,ny,nz-1)
-  //
-  //        xy-dir faces (locally f_{\pm 3}) with v_00 (the left-bottom-back corner vertex):
-  //           (0,0,0) -> (0,1,0) -> ... -> (0,ny-1,0)
-  //        -> (1,0,0) -> (1,1,0) -> ... -> (1,ny-1,0) -> ... -> (nx-1,ny-1,0)
-  //           (0,0,1) -> (0,1,1) -> ... -> (0,ny-1,1)
-  //        -> (1,0,1) -> (1,1,1) -> ... -> (1,ny-1,1) -> ... -> (nx-1,ny-1,1) -> ... ->  (nx-1,ny-1,nz)
-  //
+
+// Edges: The indexing of the edges are started with z-dir edges (with index priority z -> y -> x), 
+//                                       followed by y-dir edges (with index priority y -> z -> x),
+//                                       followed by x-dir edges (with index priority x -> z -> y)
+//
+//        z-dir edges (the edges intersecting both f_{\pm 3}) with v_0 (the intersection with f_{-3}):
+//           (0,0,0) -> (0,0,1) -> ... -> (0,0,nz-1) 
+//        -> (0,1,0) -> (0,1,1) -> ... -> (0,1,nz-1) -> ... -> (0,ny,nz-1)
+//        -> (1,0,0) -> (1,0,1) -> ... -> (1,0,nz-1)
+//        -> (1,1,0) -> (1,1,1) -> ... -> (1,1,nz-1) -> ... -> (1,ny,nz-1) -> ... -> (nx,ny,nz-1)
+//
+//        y-dir edges (the edges intersecting both f_{\pm 3}) with v_0 (the intersection with f_{-2}):
+//           (0,0,0) -> (0,1,0) -> ... -> (0,ny-1,0)
+//        -> (0,0,1) -> (0,1,1) -> ... -> (0,ny-1,1) -> ... -> (0,ny-1,nz)
+//        -> (1,0,0) -> (1,1,0) -> ... -> (1,ny-1,0)
+//        -> (1,0,1) -> (1,1,1) -> ... -> (1,ny-1,1) -> ... -> (1,ny-1,nz) -> ... ->  (nx,ny-1,nz)
+//
+//        x-dir edges (the edges intersecting both f_{\pm 1}) with v_0 (the intersection with f_{-1}):
+//           (0,0,0) -> (1,0,0) -> ... -> (nx-1,0,0)
+//        -> (0,0,1) -> (1,0,1) -> ... -> (nx-1,0,1) -> ... -> (nx-1,0,nz)
+//        -> (0,1,0) -> (1,1,0) -> ... -> (nx-1,1,0)
+//        -> (0,1,1) -> (1,1,1) -> ... -> (nx-1,1,1) -> ... -> (nx-1,1,nz) -> ... ->  (nx-1,ny,nz)
+
+Vertex* HexaMesh::edgeVertexPtr(bool pm, int i) {
+  i = i % nEdges();
+  int base_x, base_y, base_z;
+  if (i<(num_x+1)*(num_y+1)*num_z) {
+    // z-dir edges
+    base_x = i / ((num_y+1)*num_z);
+    base_y = (i - base_x*(num_y+1)*num_z) / num_z;
+    base_z = i % num_z;
+    return vertexPtr(base_x, base_y, base_z+pm);
+  } else if (i<(num_x+1)*(num_y+1)*num_z+(num_x+1)*num_y*(num_z+1)) {
+    // y-dir edges
+    i -= (num_x+1)*(num_y+1)*num_z;
+    base_x = i / (num_y*(num_z+1));
+    base_y = i % num_y;
+    base_z = (i - base_x*num_y*(num_z+1)) / num_y;
+    return vertexPtr(base_x, base_y+pm, base_z);
+  } else {
+    // x-dir edges
+    i -= (num_x+1)*(num_y+1)*num_z+(num_x+1)*num_y*(num_z+1);
+    base_x = i % num_x;
+    base_y = i / (num_x*(num_z+1));
+    base_z = (i - base_y*num_x*(num_z+1)) / num_x;
+    return vertexPtr(base_x+pm, base_y, base_z);
+  }
+}
+
+// Faces: The indexing of the edges are started with yz-dir faces (with index priority z -> y -> x),
+//                                       followed by xz-dir faces (with index priority z -> x -> y),
+//                                       followed by xy-dir faces (with index priority y -> x -> z)
+//
+//        yz-dir faces (locally f_{\pm 1}) with v_00 (the left-bottom-back corner vertex):
+//           (0,0,0) -> (0,0,1) -> ... -> (0,0,nz-1) 
+//        -> (0,1,0) -> (0,1,1) -> ... -> (0,1,nz-1) -> ... -> (0,ny-1,nz-1)
+//        -> (1,0,0) -> (1,0,1) -> ... -> (1,0,nz-1)
+//        -> (1,1,0) -> (1,1,1) -> ... -> (1,1,nz-1) -> ... -> (1,ny-1,nz-1) -> ... -> (nx,ny-1,nz-1)
+//
+//        xz-dir faces (locally f_{\pm 2}) with v_00 (the left-bottom-back corner vertex):
+//           (0,0,0) -> (0,0,1) -> ... -> (0,0,nz-1) 
+//        -> (1,0,0) -> (1,0,1) -> ... -> (1,0,nz-1) -> ... -> (nx-1,0,nz-1)
+//        -> (0,1,0) -> (0,1,1) -> ... -> (0,1,nz-1)
+//        -> (1,1,0) -> (1,1,1) -> ... -> (1,1,nz-1) -> ... -> (nx-1,1,nz-1) -> ... ->  (nx-1,ny,nz-1)
+//
+//        xy-dir faces (locally f_{\pm 3}) with v_00 (the left-bottom-back corner vertex):
+//           (0,0,0) -> (0,1,0) -> ... -> (0,ny-1,0)
+//        -> (1,0,0) -> (1,1,0) -> ... -> (1,ny-1,0) -> ... -> (nx-1,ny-1,0)
+//           (0,0,1) -> (0,1,1) -> ... -> (0,ny-1,1)
+//        -> (1,0,1) -> (1,1,1) -> ... -> (1,ny-1,1) -> ... -> (nx-1,ny-1,1) -> ... ->  (nx-1,ny-1,nz)
 
 Vertex* HexaMesh::faceVertexPtr(bool pm0, bool pm1, int i) {
   i = i % nFaces();

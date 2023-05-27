@@ -325,6 +325,9 @@ namespace hexamesh {
     // Access the vertex by its geometric position
     Vertex* vertexPtr(int ix, int iy, int iz) { return vertexPtr( vertexIndex(ix,iy,iz) ); };
 
+    // Access the vertex of edge by its position in the array
+    Vertex* edgeVertexPtr(bool pm, int i);
+
     // Access the vertex of face by its position in the array
     Vertex* faceVertexPtr(bool pm0, bool pm1, int i);
     // Access the center of face by its position in the array

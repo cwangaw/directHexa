@@ -10,3 +10,10 @@ directhexa.x86_64
 directhexa_x86_64.a
 test/dsSpaceOut.m
 test/dsSpaceOut.txt
+test/matrix.txt
+test/solution_grad_mesh.dat
+test/solution_mesh.dat
+test/solution.txt
+test/test_grad_mesh.dat
+test/test_mesh.dat
+test/rhs.txt

@@ -64,6 +64,17 @@ namespace directserendipity {
 
     void write_raw(std::ofstream& fout) const;
     int write_raw(std::string& filename) const;
+
+    void write_tecplot_mesh(std::ofstream* fout, std::ofstream* fout_grad,
+			   int num_pts_x, int num_pts_y, int num_pts_z) const;
+    void write_tecplot_mesh(std::ofstream& fout, std::ofstream& fout_grad,
+			   int num_pts_x, int num_pts_y, int num_pts_z) const {
+      write_tecplot_mesh(&fout, &fout_grad, num_pts_x, num_pts_y, num_pts_z); };
+    void write_tecplot_mesh(std::ofstream& fout, int num_pts_x, int num_pts_y, int num_pts_z) const {
+      write_tecplot_mesh(&fout, nullptr, num_pts_x, num_pts_y, num_pts_z); };
+    int write_tecplot_mesh(std::string& filename, std::string& filename_grad,
+			  int num_pts_x, int num_pts_y, int num_pts_z) const;
+    int write_tecplot_mesh(std::string& filename, int num_pts_x, int num_pts_y, int num_pts_z) const;
   };
   
   ////////////////////////////////////////////////////////////////////////////////
@@ -98,7 +109,7 @@ namespace directserendipity {
     
     // coefficients for edge shape functions varphi_{n,s} to form 
     // a linear combination to serve as the expected function on each edge
-    std::vector<double>* edgevarpahi_eval_mat_inv = nullptr;
+    std::vector<double>* edgecheby_eval_mat_inv = nullptr;
     double* edge_basis_coefficients = nullptr;
     Point* edge_nodes = nullptr;
 
@@ -115,14 +126,11 @@ namespace directserendipity {
     // The varphi functions
     void faceVarphi(int n, int s, const Point& pt, double& value, Tensor1& gradvalue);
     void edgeVarphi(int n, int s, const Point& pt, double& value, Tensor1& gradvalue);
-    // The expected value on each edge - bubble*chebyshev
-    double edgeCheby(int n, int s, const Point& pt);
+
     // Special function, piecewise linear or rational, dir=0,1,2 correspond to x,y,z
     void specFunc(int dir, const Point& pt, double& value, Tensor1& gradvalue);
     void edgePsi(int dir, const Point& pt, double& value, Tensor1& gradvalue);
   
-   
-
     void set_directserendipityfe(DirectSerendipity* dsSpace, hexamesh::Element* element);
 
   public:
@@ -148,6 +156,9 @@ namespace directserendipity {
     int nFaceDoFs() const { return num_face_dofs; };
     int nCellDoFs() const { return num_cell_dofs; };
     int nDoFs() const { return num_dofs; };
+
+    // The expected value on each edge - bubble*chebyshev
+    double edgeCheby(int iEdge, int nPt, int s);
 
     // FE basis functions
 
@@ -188,7 +199,14 @@ namespace directserendipity {
     // Output functions
     void write_raw(std::ofstream& fout) const;
     int write_raw(std::string& filename) const;
+
+    void write_tecplot(std::ofstream* fout, std::ofstream* fout_grad, int num_pts_x, int num_pts_y, int num_pts_z,
+        double* vertex_dofs, double* edge_dofs=nullptr, double* face_dofs=nullptr, double* cell_dofs=nullptr);
+    int write_tecplot(std::string& filename, std::string& filename_grad,
+			  int num_pts_x, int num_pts_y, int num_pts_z,
+        double* vertex_dofs, double* edge_dofs=nullptr, double* face_dofs=nullptr, double* cell_dofs=nullptr);
   };
+  
   ////////////////////////////////////////////////////////////////////////////////
   // class DirectSerendipity
   //   Defined on a logically rectangular mesh (class HexaMesh), consisting of direct serendipity
@@ -200,7 +218,6 @@ namespace directserendipity {
   //
   ////////////////////////////////////////////////////////////////////////////////
 
-  
   class DirectSerendipity
   {
   private:
@@ -216,6 +233,9 @@ namespace directserendipity {
     Point* face_dofs = nullptr;
 
     DirectSerendipityFE* the_ds_elements = nullptr;
+    bool* is_interior = nullptr;
+    double* edge_cheby = nullptr;
+    int* bc_edge_index = nullptr;
 
     void set_directserendipity(int polyDeg, int suppType, hexamesh::HexaMesh* mesh);
     
@@ -240,8 +260,15 @@ namespace directserendipity {
     int nSingleCellDoFs() const { return num_dofs_per_cell; };
     int nCellDoFs() const { return my_mesh->nElements() * nSingleCellDoFs(); };
 
-    DirectSerendipityFE* finiteElementPtr(int i) const { return &the_ds_elements[i]; }
-    Point* faceDoFPtr(int nFace, int iDoF) const { return &face_dofs[nFace*num_dofs_per_face+iDoF]; }
+    DirectSerendipityFE* finiteElementPtr(int i) const { return &the_ds_elements[i]; };
+    Point* faceDoFPtr(int nFace, int iDoF) const { return &face_dofs[nFace*num_dofs_per_face+iDoF]; };
+    bool isInterior(int iDoF) const { return is_interior[iDoF]; };
+
+    // The expected value on each edge - bubble*chebyshev
+    double edgeCheby(int iEdge, int nPt, int s) { return edge_cheby[iEdge*(polynomial_degree-1)*(polynomial_degree-1) + nPt*(polynomial_degree-1) + s]; };
+    void bcModification(double* bc_vals);
+
+    
     void write_raw(std::ofstream& fout) const;
     int write_raw(std::string& filename) const;
 
