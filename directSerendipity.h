@@ -52,6 +52,8 @@ namespace directserendipity {
     double& operator[] (int i)       { return the_array[i]; }
     double  operator[] (int i) const { return the_array[i]; }
 
+    double* theArray() const { return the_array; };
+
     void eval(const Point* pts, double* result, Tensor1* gradResult, int num_pts) const;
     void eval(const Point& pt, double& result, Tensor1& gradResult) const;
     double eval(const Point& pt) const;
@@ -230,6 +232,7 @@ namespace directserendipity {
     int num_dofs_per_face;
     int num_dofs_per_cell;
 
+    Point* edge_nodes = nullptr;
     Point* face_dofs = nullptr;
 
     DirectSerendipityFE* the_ds_elements = nullptr;
@@ -262,11 +265,15 @@ namespace directserendipity {
 
     DirectSerendipityFE* finiteElementPtr(int i) const { return &the_ds_elements[i]; };
     Point* faceDoFPtr(int nFace, int iDoF) const { return &face_dofs[nFace*num_dofs_per_face+iDoF]; };
+    Point* edgeNodePtr(int nEdge, int iDoF) const { return &edge_nodes[nEdge*(polynomial_degree-1)+iDoF]; };
+    Point* faceDoFPtr(int iDoF) const { return &face_dofs[iDoF]; };
+    Point* edgeNodePtr(int iDoF) const { return &edge_nodes[iDoF]; };
     bool isInterior(int iDoF) const { return is_interior[iDoF]; };
 
     // The expected value on each edge - bubble*chebyshev
     double edgeCheby(int iEdge, int nPt, int s) { return edge_cheby[iEdge*(polynomial_degree-1)*(polynomial_degree-1) + nPt*(polynomial_degree-1) + s]; };
     void bcModification(double* bc_vals);
+    void nodeModification(double* node_vals);
 
     
     void write_raw(std::ofstream& fout) const;

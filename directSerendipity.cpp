@@ -121,7 +121,8 @@ void DirectSerendipityArray::eval(const Point* pts, double* result,
       result[i] = 0;
       gradResult[i].set(0,0);
     }
-  } 
+  }
+  return;
 }
 
 void DirectSerendipityArray::eval(const Point& pt, double& result, Tensor1& gradResult) const {
@@ -169,7 +170,8 @@ void DirectSerendipityArray::eval(const Point& pt, double& result, Tensor1& grad
   }
 
   // Evaluate
-  elem->eval(pt, result, gradResult, vertex_dofs, edge_dofs, face_dofs, cell_dofs); 
+  elem->eval(pt, result, gradResult, vertex_dofs, edge_dofs, face_dofs, cell_dofs);
+  return;
  }
 
 double DirectSerendipityArray::eval(const Point& pt) const {
@@ -221,35 +223,40 @@ void DirectSerendipityArray::l2normError(double& l2Error, double& l2GradError, d
 					 double (*referenceFcn)(double,double,double),
 					 Tensor1 (*referenceGradFcn)(double,double,double)) {
   l2Error = 0, l2GradError = 0, l2Norm = 0, l2GradNorm = 0;
-  Quadrature quadRule(8,refinement_level);
+  Quadrature quadRule(8);
 
   for(int iElement=0; iElement < my_ds_space->mesh()->nElements(); iElement++) {
     DirectSerendipityFE* fePtr = my_ds_space->finiteElementPtr(iElement);
     quadRule.setElement(my_ds_space->supplementType(), refinement_level, fePtr->elementPtr());
-    
+
+    double result[quadRule.num()];
+    Tensor1* gradResult = new Tensor1[quadRule.num()];
+
+    eval(quadRule.pts(), result, gradResult,quadRule.num());
+
     for(int iPt=0; iPt<quadRule.num(); iPt++) {
       double x = quadRule.pt(iPt).val(0);
       double y = quadRule.pt(iPt).val(1);
       double z = quadRule.pt(iPt).val(2);
       
-      double result; Tensor1 gradResult;
-      eval(quadRule.pt(iPt), result, gradResult);
-      
-      double diff = (referenceFcn == nullptr) ? result : (result - referenceFcn(x,y,z));
-      Tensor1 diffGrad = (referenceGradFcn == nullptr) ? gradResult : (gradResult - referenceGradFcn(x,y,z));
+      double diff = (referenceFcn == nullptr) ? result[iPt] : (result[iPt] - referenceFcn(x,y,z));
+      Tensor1 diffGrad = (referenceGradFcn == nullptr) ? gradResult[iPt] : (gradResult[iPt] - referenceGradFcn(x,y,z));
       
       l2Error += pow(diff,2) * quadRule.wt(iPt);
       l2GradError += diffGrad * diffGrad * quadRule.wt(iPt);
 
-      l2Norm += pow(result,2) * quadRule.wt(iPt);
-      l2GradNorm += gradResult * gradResult * quadRule.wt(iPt);
+      l2Norm += pow(result[iPt],2) * quadRule.wt(iPt);
+      l2GradNorm += gradResult[iPt] * gradResult[iPt] * quadRule.wt(iPt);
     }
+    delete[] gradResult;
   }
   
   l2Error = sqrt(l2Error);
   l2GradError = sqrt(l2GradError);
   l2Norm = sqrt(l2Norm);
   l2GradNorm = sqrt(l2GradNorm);
+
+  return;
 }
 
 void DirectSerendipityArray::write_raw(std::ofstream& fout) const {
@@ -304,6 +311,7 @@ void DirectSerendipityArray::write_tecplot_mesh(std::ofstream* fout, std::ofstre
   double vertexResult[my_ds_space->mesh()->nVertices()];
   Tensor1* gradResult = new Tensor1[num_pts_x*num_pts_y*num_pts_z];
   Tensor1* vertexGradResult = new Tensor1[my_ds_space->mesh()->nVertices()];
+
   eval(pts, result, gradResult, num_pts_x*num_pts_y*num_pts_z);
   eval(vertices, vertexResult, vertexGradResult, my_ds_space->mesh()->nVertices());
 
@@ -369,10 +377,12 @@ void DirectSerendipityArray::write_tecplot_mesh(std::ofstream* fout, std::ofstre
     }
   }
 
-  delete[] gradResult;
-  delete[] vertexGradResult;
   delete[] pts;
   delete[] vertices;
+  delete[] gradResult;
+  delete[] vertexGradResult;
+
+  return;
 };
 
 int DirectSerendipityArray::write_tecplot_mesh(std::string& filename, std::string& filename_grad,
@@ -403,6 +413,23 @@ void DirectSerendipity::set_directserendipity(int polyDeg, int suppType, HexaMes
   num_dofs_per_cell = (polynomial_degree < 6)? 0 : (polynomial_degree-3)*(polynomial_degree-4)*(polynomial_degree-5)/6;
   
   num_dofs = my_mesh->nVertices() + my_mesh->nEdges() * (polynomial_degree-1) + my_mesh->nFaces() * num_dofs_per_face + my_mesh->nElements() * num_dofs_per_cell;
+
+  // set edge nodes
+  if (polynomial_degree > 1) {
+    if (edge_nodes) delete[] edge_nodes; 
+    edge_nodes = new Point[my_mesh->nEdges()*(polynomial_degree-1)];
+
+    for (int iEdge=0; iEdge<my_mesh->nEdges(); iEdge++) {
+      Vertex* v0 = my_mesh->edgeVertexPtr(0,iEdge);
+      Vertex* v1 = my_mesh->edgeVertexPtr(1,iEdge);
+      Tensor1 tangent(*v1-*v0);
+      double length = tangent.norm();
+      tangent /= length;
+      for (int nPt=0; nPt<polynomial_degree-1; nPt++) {
+        edge_nodes[iEdge*(polynomial_degree-1)+nPt].set(*v0 + (nPt+1)*length*tangent/polynomial_degree);    
+      }
+    } 
+  }
 
   // set face dofs
   if (num_dofs_per_face>0) {
@@ -450,16 +477,15 @@ void DirectSerendipity::set_directserendipity(int polyDeg, int suppType, HexaMes
       Tensor1 tangent(*v1-*v0);
       double length = tangent.norm();
       tangent /= length;
-    for (int nPt=0; nPt<polynomial_degree-1; nPt++) {
-      Point pt(*v0 + (nPt+1)*length*tangent/polynomial_degree);
+    for (int nPt=0; nPt<polynomial_degree-1; nPt++) {  
       for (int s=0; s<polynomial_degree-1; s++) {
-        double x = Tensor1(pt-(*v0+*v1)/2)*tangent;
+        double x = Tensor1(edge_nodes[iEdge*(polynomial_degree-1)+nPt]-(*v0+*v1)/2)*tangent;
 
         double value=0;
         for (int t=0; t<=floor(s/2); t++) {
           value += fact(s)/fact(2*t)/fact(s-2*t) * pow(4*x*x/length/length-1,t) * pow(2*x/length,s-2*t);
         }
-        value *= Tensor1(pt-*v0)*Tensor1(*v1-pt);
+        value *= Tensor1(edge_nodes[iEdge*(polynomial_degree-1)+nPt]-*v0)*Tensor1(*v1-edge_nodes[iEdge*(polynomial_degree-1)+nPt]);
         edge_cheby[iEdge*(polynomial_degree-1)*(polynomial_degree-1) + nPt*(polynomial_degree-1) + s] = value / pow(length/2,2);
       }
     }
@@ -565,6 +591,7 @@ void DirectSerendipity::set_directserendipity(int polyDeg, int suppType, HexaMes
 }
 
 DirectSerendipity::~DirectSerendipity() {
+  if (edge_nodes) delete[] edge_nodes; 
   if (face_dofs) delete[] face_dofs;
   if (the_ds_elements) delete[] the_ds_elements;
   if (is_interior) delete[] is_interior;
@@ -612,8 +639,9 @@ void DirectSerendipity::bcModification(double* bc_vals) {
       }        
     }
 
-    lapack_int* ipiv; char norm = 'I'; 
-    ipiv = (lapack_int*)malloc((degPolyn()-1) * sizeof(lapack_int));
+    lapack_int* ipiv; char norm = 'I';
+    int size = degPolyn()-1;
+    ipiv = (lapack_int*)malloc(size * sizeof(lapack_int));
     double anorm = LAPACKE_dlange(LAPACK_ROW_MAJOR, norm, degPolyn()-1, degPolyn()-1, A, degPolyn()-1);
     int ierr = LAPACKE_dgesv(LAPACK_ROW_MAJOR, degPolyn()-1, 1, A, degPolyn()-1, ipiv, rhs, 1); //mat updated to be LU
     if(ierr) { // ?? what should we do ???
@@ -625,8 +653,48 @@ void DirectSerendipity::bcModification(double* bc_vals) {
     for (int i=0; i<degPolyn()-1; i++) {
       bc_vals[starting_dof+i] = rhs[i];
     }
+    free(ipiv);
   }
+  return;
+}
 
+void DirectSerendipity::nodeModification(double* bc_vals) {
+  for (int iEdge=0; iEdge<my_mesh->nEdges(); iEdge++) {
+    int starting_dof = my_mesh->nVertices() + iEdge * (degPolyn()-1);
+
+    double eval_v0 = bc_vals[my_mesh->edgeVertexPtr(0,iEdge)->meshIndex()];
+    double eval_v1 = bc_vals[my_mesh->edgeVertexPtr(1,iEdge)->meshIndex()];
+
+    std::vector<double> A_vec((degPolyn()-1)*(degPolyn()-1),0);
+    double* A = A_vec.data();
+
+    std::vector<double> rhs_vec((degPolyn()-1)*(degPolyn()-1),0);
+    double* rhs = rhs_vec.data();
+
+    
+    for (int iRow=0; iRow<degPolyn()-1; iRow++) {
+      rhs[iRow] = bc_vals[starting_dof+iRow] - (eval_v0 * (1-(double)(iRow+1)/degPolyn()) + eval_v1 * (double)(iRow+1)/degPolyn());
+      for (int jCol=0; jCol<degPolyn()-1; jCol++) {
+        A[iRow*(degPolyn()-1)+jCol] = edgeCheby(iEdge, iRow, jCol);
+      }        
+    }
+
+    lapack_int* ipiv; char norm = 'I';
+    int size = degPolyn()-1;
+    ipiv = (lapack_int*)malloc(size * sizeof(lapack_int));
+    double anorm = LAPACKE_dlange(LAPACK_ROW_MAJOR, norm, degPolyn()-1, degPolyn()-1, A, degPolyn()-1);
+    int ierr = LAPACKE_dgesv(LAPACK_ROW_MAJOR, degPolyn()-1, 1, A, degPolyn()-1, ipiv, rhs, 1); //mat updated to be LU
+    if(ierr) { // ?? what should we do ???
+      std::cerr << "ERROR: Lapack failed with code " << ierr << std::endl; 
+    }
+    double rcond = 0;
+    ierr = LAPACKE_dgecon(LAPACK_ROW_MAJOR, norm, degPolyn()-1, A, degPolyn()-1, anorm, &rcond);
+
+    for (int i=0; i<degPolyn()-1; i++) {
+      bc_vals[starting_dof+i] = rhs[i];
+    }
+    free(ipiv);
+  }
   return;
 }
 

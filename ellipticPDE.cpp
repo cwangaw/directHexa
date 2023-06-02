@@ -21,7 +21,7 @@ using namespace hexamesh;
 using namespace quadrature;
 
 int EllipticPDE::solve(Monitor& monitor) {
-  //monitor(0,"Polynomial Degree = ", parameterDataPtr()->dsSpace.degPolyn());
+  monitor(0,"Polynomial Degree = ", parameterDataPtr()->dsSpace.degPolyn());
 
   ParameterData& param = *parameterDataPtr();
 
@@ -34,19 +34,13 @@ int EllipticPDE::solve(Monitor& monitor) {
 
   // TEST BASIS FUNCTION ///////////////////////////////////////////////////////
 
-  if (true) {
+  if (false) {
     DirectSerendipityArray testingarray(&(param.dsSpace));
     for(int i=0; i<param.mesh.nVertices(); i++) {
-      testingarray[i] = 0; //trueSoln(param.mesh.vertexPtr(i)->val(0), param.mesh.vertexPtr(i)->val(1), param.mesh.vertexPtr(i)->val(2));
-      //std::cout << "iDoF[" << i << "]:" << " " << testingarray[i] << std::endl; 
+      testingarray[i] = 0;  
     }
-   
-    for(int i=0; i<param.mesh.nEdges(); i++) {
-      //Point pt = (*param.mesh.edgeVertexPtr(0,i) + *param.mesh.edgeVertexPtr(1,i)) / 2;
-      testingarray[i+param.mesh.nVertices()] = 0;
-      //std::cout << "iDoF[" << i << "]:" << " " << testingarray[i+param.mesh.nVertices()] << std::endl; 
-    }
-    testingarray[param.mesh.nVertices()] = 1;
+
+    testingarray[13] = 1;
 
     std::string fileName(param.directory_name);
     fileName += "test_mesh";
@@ -80,7 +74,6 @@ int EllipticPDE::solve(Monitor& monitor) {
 
   // SOLVE THE PDE ///////////////////////////////////////////////////////////
   
-  if (true) {
   monitor(0,"\nSolve the PDE\n");
   
   DirectSerendipityArray solution(&(param.dsSpace));
@@ -154,8 +147,6 @@ int EllipticPDE::solve(Monitor& monitor) {
       node_loc_to_gbl[i] = index_correction[fePtr->elementPtr()->vertexGlobal(i)];
       node_loc_to_bc[i] = bc_correction[fePtr->elementPtr()->vertexGlobal(i)];
     }
-
-
 
     for (int iEdge=0; iEdge<12; iEdge++) {
       int iEdge_global = fePtr->elementPtr()->edgeGlobal(iEdge);
@@ -294,9 +285,10 @@ int EllipticPDE::solve(Monitor& monitor) {
     std::cerr << "ERROR: Lapack failed with code " << ierr << std::endl; 
   }
   rcond = 1/rcond;
+  free(ipiv);
 
   std::ofstream sout("test/solution.txt");
-  sout.precision(6);
+  sout.precision(24);
   for(int i=0; i<nn; i++) {
     sout << rhs[i];
     if (i < nn - 1) sout << "\n";
@@ -342,7 +334,7 @@ int EllipticPDE::solve(Monitor& monitor) {
     monitor(0,"\nError estimate\n"); ///////////////////////////////////////////////
 
     double l2Error = 0, l2GradError = 0, l2Norm = 0, l2GradNorm = 0;
-    solution.l2normError(l2Error, l2GradError, l2Norm, l2GradNorm, param.refinement_level*0, trueSoln, trueGradSoln);
+    solution.l2normError(l2Error, l2GradError, l2Norm, l2GradNorm, param.refinement_level, trueSoln, trueGradSoln);
 
     std::cout << "  L_2 Error:      " << l2Error << std::endl;
     std::cout << "  L_2 Grad Error: " << l2GradError << std::endl;
@@ -352,61 +344,54 @@ int EllipticPDE::solve(Monitor& monitor) {
     std::cout << std::endl;
 
     if(param.output_soln_DS_format > 0) {
-      /*
-      monitor(1,"Write True Solution"); ////////////////////////////////////////////
+
+      monitor(1,"Write Interpolation Solution, only work for polynomial degree r < 6\n"); ////////////////////////////////////////////
 
       DirectSerendipityArray u(&(param.dsSpace));
 
       for(int i=0; i<u.size(); i++) {
-        double x = param.dsSpace.nodePtr(i)->val(0);
-        double y = param.dsSpace.nodePtr(i)->val(1);
-        u[i] = trueSoln(x,y);
+        if (i<param.dsSpace.nVertexDoFs()) {
+          Vertex* v = param.mesh.vertexPtr(i);
+          u[i] = trueSoln(v->val(0),v->val(1),v->val(2));
+        } else if (i<param.dsSpace.nVertexDoFs()+param.dsSpace.nEdgeDoFs()) {
+          Point* pt = param.dsSpace.edgeNodePtr(i-param.dsSpace.nVertexDoFs());
+          u[i] = trueSoln(pt->val(0),pt->val(1),pt->val(2));
+        } else {
+          Point* pt = param.dsSpace.faceDoFPtr(i-param.dsSpace.nVertexDoFs()-param.dsSpace.nEdgeDoFs());
+          u[i] = trueSoln(pt->val(0),pt->val(1),pt->val(2));
+        }
       }
+
+      param.dsSpace.nodeModification(u.theArray());
+
+      double l2InterpError = 0, l2InterpGradError = 0, l2InterpNorm = 0, l2InterpGradNorm = 0;
+      u.l2normError(l2InterpError, l2InterpGradError, l2InterpNorm, l2InterpGradNorm, param.refinement_level, trueSoln, trueGradSoln);
+
+      std::cout << "  L_2 Interpolation Error:      " << l2InterpError << std::endl;
+      std::cout << "  L_2 Interpolation Grad Error: " << l2InterpGradError << std::endl;
+      std::cout << std::endl;
+      std::cout << "  Relative L_2 Interpolation Error:      " << l2InterpError/l2InterpNorm << std::endl;
+      std::cout << "  Relative L_2 Interpolation Grad Error: " << l2InterpGradError/l2InterpGradNorm << std::endl;
+      std::cout << std::endl;
 
       switch(param.output_soln_DS_format) {
       case 1: {
         std::string fileName(param.directory_name);
-        fileName += "true_solution_raw";
+        fileName += "interpolation_raw";
         u.write_raw(fileName);
         break;
       }
       case 2: {
         std::string fileName(param.directory_name);
-        fileName += "true_solution_mesh";
+        fileName += "interpolation_mesh";
         std::string fileNameGrad(param.directory_name);
-        fileNameGrad += "true_solution_grad_mesh";
-        u.write_matlab_mesh(fileName,fileNameGrad,
-        param.output_mesh_numPts_DS_x,param.output_mesh_numPts_DS_y);
+        fileNameGrad += "interpolation_grad_mesh";
+        u.write_tecplot_mesh(fileName,fileNameGrad,
+        param.output_mesh_numPts_DS_x,param.output_mesh_numPts_DS_y,param.output_mesh_numPts_DS_z);
         break;
       }
       }
-      monitor(1,"Write Error"); ////////////////////////////////////////////
-
-      switch(param.output_soln_DS_format) {
-      case 1: {
-        break;
-      }
-      case 2: {
-        std::string fileName(param.directory_name);
-        fileName += "solution_mesh_error";
-        std::string fileNameGrad(param.directory_name);
-        fileNameGrad += "solution_mesh_grad_error";
-        solution.write_matlab_mesh_error(fileName,
-        param.output_mesh_numPts_DS_x,param.output_mesh_numPts_DS_y, trueSoln);
-        solution.write_matlab_mesh_grad_error(fileNameGrad,
-        param.output_mesh_numPts_DS_x,param.output_mesh_numPts_DS_y, trueGradSoln);
-        fileName += "_on_element";
-        fileNameGrad += "_on_element";
-        solution.write_matlab_mesh_error_on_element(fileName,
-        param.output_mesh_numPts_DS_x,param.output_mesh_numPts_DS_y, param.refinement_level*0, trueSoln);
-        solution.write_matlab_mesh_grad_error_on_element(fileNameGrad,
-        param.output_mesh_numPts_DS_x,param.output_mesh_numPts_DS_y, param.refinement_level*0, trueGradSoln);
-        break;
-      }
-      }
-      */
     }
-  }
   }
   return 0;
 }

@@ -39,7 +39,7 @@ int Vertex::write_raw(std::string& filename) const {
 
 ////////////////////////////////////////////////////////////////////////////////
 // Class Element
-static const double element_eps = 1e-8;
+static const double element_eps = 1e-12;
 
 void Element::set_element(int ix, int iy, int iz, int i, HexaMesh* myMesh) {
   my_mesh_pos[0] = ix;
