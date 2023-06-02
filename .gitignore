@@ -17,3 +17,5 @@ test/solution.txt
 test/test_grad_mesh.dat
 test/test_mesh.dat
 test/rhs.txt
+test/interpolation_grad_mesh.dat
+test/interpolation_mesh.dat
