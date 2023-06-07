@@ -31,9 +31,9 @@ AR       = ar
 ARFLAGS  = -rUv
 RANLIB   = ranlib
 
-LDFLAGS = 
-LIBS    = -lm -lblas -llapack -llapacke
+LDFLAGS = -L$(SUITESPARSE_DIR)/UMFPACK/build/  
+LIBS    = -lm -lblas -llapack -llapacke -lumfpack
 #  -lg2c -lf2c
-#LIBS    = -L$(MKLROOT)/lib/intel64/ -lmkl_lapack95_lp64 -Wl,--start-group -lmkl_intel_lp64 -lmkl_sequential -lmkl_core -Wl,--end-group -lpthread -lm -lc
+#LIBS    = -L$(MKLROOT)/lib/intel64/ -lmkl_lapack95_lp64 -Wl,--start-group -lmkl_intel_lp64 -lmkl_sequential -lmkl_core -Wl,--end-group -lpthread -lm -lc 
 
 DEPENDFLAGS = $(INCLUDE_DIRS)

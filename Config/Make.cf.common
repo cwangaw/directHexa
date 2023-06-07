@@ -1,1 +1,1 @@
-INCLUDE_DIRS = -I$(HOME) -I$(HOME)/Mesh -I$(HOME)/Reader -I$(HOME)/Utilities -I. -I/Users/arbogast/.local/include/
+INCLUDE_DIRS = -I$(HOME) -I$(HOME)/Mesh -I$(HOME)/Reader -I$(HOME)/Utilities -I. -I/Users/arbogast/.local/include/ -I$(SUITESPARSE_DIR)/UMFPACK/Include -I$(SUITESPARSE_DIR)/SuiteSparse_config -I$(SUITESPARSE_DIR)/AMD/Include 

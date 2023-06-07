@@ -52,6 +52,37 @@ void DirectSerendipityFE::set_directserendipityfe(DirectSerendipity* dsSpace, El
   num_cell_dofs = (deg_cell_poly<0)? 0:(polynomial_degree-3)*(polynomial_degree-4)*(polynomial_degree-5)/6;
   num_dofs = 8 + 12*(polynomial_degree-1) + num_face_dofs + num_cell_dofs; // Redundant with above
 
+
+  if (global_dofs) delete[] global_dofs;
+  global_dofs = new int[num_dofs];
+
+  for(int i=0; i<8; i++) {
+    global_dofs[i] = element->vertexGlobal(i);
+  }
+
+  for (int iEdge=0; iEdge<12; iEdge++) {
+    int iEdge_global = element->edgeGlobal(iEdge);
+    for (int jDoF=0; jDoF<polynomial_degree-1; jDoF++) {
+      global_dofs[8 + iEdge*(polynomial_degree-1) + jDoF] = dsSpace->nVertexDoFs() + iEdge_global*(polynomial_degree-1) + jDoF;
+    }
+  }
+
+  if (num_face_dofs>0) {
+    for (int iFace=0; iFace<6; iFace++) {
+      int iFace_global = element->faceGlobal(iFace);
+      for (int jDoF=0; jDoF<num_face_dofs/6; jDoF++) {
+        global_dofs[8 + 12*(polynomial_degree-1) + iFace*num_face_dofs/6 + jDoF] = dsSpace->nVertexDoFs() + dsSpace->nEdgeDoFs() + iFace_global*num_face_dofs/6 + jDoF;
+      }
+    }
+  }
+
+  if (num_cell_dofs>0) {
+    int iCell_global = element->meshIndex();
+    for (int jDoF=0; jDoF<num_cell_dofs; jDoF++) {
+      global_dofs[8 + 12*(polynomial_degree-1) + num_face_dofs + jDoF] = dsSpace->nVertexDoFs() + dsSpace->nEdgeDoFs() + dsSpace->nFaceDoFs() + iCell_global*num_cell_dofs + jDoF;
+    }
+  }
+
   // Set up higher order element (if nescessary)
   if(polynomial_degree<3) {
     if(one_element_mesh) delete one_element_mesh;
@@ -143,6 +174,7 @@ void DirectSerendipityFE::set_directserendipityfe(DirectSerendipity* dsSpace, El
 
 
 DirectSerendipityFE::~DirectSerendipityFE() {
+  if (global_dofs) delete[] global_dofs;
   if (high_order_ds_space) delete high_order_ds_space;
   if (one_element_mesh) delete one_element_mesh;
   if (face_basis_coefficients) delete[] face_basis_coefficients;

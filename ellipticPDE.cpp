@@ -15,6 +15,7 @@
 #include <complex.h>
 #include "lapacke.h"
 #include <cblas.h>
+#include "umfpack.h"
 
 using namespace directserendipity;
 using namespace hexamesh;
@@ -53,9 +54,9 @@ int EllipticPDE::solve(Monitor& monitor) {
   // DEBUG ///////////////////////////////////////////////////////////
 
   if (false) {
-    DirectSerendipityArray testingarray(&(param.dsSpace));
-    for(int i=0; i<param.mesh.nVertices(); i++) {
-      testingarray[i] = 0;  
+    std::vector<std::array<int,2>>* vec_ptr = param.dsSpace.indicesPtr();
+    for (unsigned int iArray=0; iArray<(*vec_ptr).size(); iArray++) {
+      std::cout << iArray << ":  (" <<  (*vec_ptr)[iArray][0] << "," << (*vec_ptr)[iArray][1] << ")" << std::endl;
     }
   }
     
@@ -66,29 +67,10 @@ int EllipticPDE::solve(Monitor& monitor) {
   
   DirectSerendipityArray solution(&(param.dsSpace));
 
-  // Correct for BCSs: If node i is an interior node, i-th element of index_correction 
-  // would give its index in our vector without BC nodes. If node i is a BC node, the  
-  // i-th element would give -1.
-  std::vector<int> index_correction(param.dsSpace.nDoFs());
-  int nn = 0;
-
-  // Correct for BCSs: If node i is a BC node, i-th element of index_correction 
-  // would give its index in our vector without interior nodes. If node i is an interior node, the  
-  // i-th element would give -1.
-  std::vector<int> bc_correction(param.dsSpace.nDoFs());
-  int mm = 0;
-
   std::vector<double> bc_vals; bc_vals.clear();
 
   for (int i = 0; i < param.dsSpace.nDoFs(); i++) {
-    if (param.dsSpace.isInterior(i)) {
-      bc_correction[i] = -1;
-      index_correction[i] = nn;
-      nn++;
-    } else {
-      index_correction[i] = -1;
-      bc_correction[i] = mm;
-      mm++;
+    if (!param.dsSpace.isInterior(i)) {
       // evaluate the bc point
       if (i<param.dsSpace.nVertexDoFs()) {
         bc_vals.push_back(bcVal(param.mesh.vertexPtr(i)->val(0), param.mesh.vertexPtr(i)->val(1), param.mesh.vertexPtr(i)->val(2)));
@@ -107,11 +89,22 @@ int EllipticPDE::solve(Monitor& monitor) {
 
   if(param.dsSpace.degPolyn() >= 2) param.dsSpace.bcModification(bc_vals.data());
 
-  std::vector<double> mat_vector(nn*nn,0);
-  double* mat = mat_vector.data();
-  std::vector<double> rhs_vector(nn,0);
-  double* rhs = rhs_vector.data();
+  int nn = param.dsSpace.nInteriorDoFs();
+  std::vector<std::array<int,2>>* vec_ptr = param.dsSpace.indicesPtr();
+  std::vector<int32_t> Ap(nn+1); 
+  std::vector<int32_t> Ai((*vec_ptr).size());
+  std::vector<double> Ax((*vec_ptr).size(),0);
+  std::vector<double> b((*vec_ptr).size(),0);
+  std::vector<double> x(nn);
 
+  Ap[0] = 0;
+  for (unsigned int iArray=0; iArray<(*vec_ptr).size(); iArray++) {
+    Ai[iArray] = (*vec_ptr)[iArray][0];
+    if (iArray>0 && (*vec_ptr)[iArray][1]!=(*vec_ptr)[iArray-1][1]) {
+      Ap[(*vec_ptr)[iArray][1]] = iArray;
+    }
+  }
+  Ap[nn] = (*vec_ptr).size();
   // quadrature points
   quadrature::Quadrature quadRule(10);
 
@@ -131,35 +124,9 @@ int EllipticPDE::solve(Monitor& monitor) {
     // Determine local to global bc map
     int node_loc_to_bc[nn_loc];
 
-    for(int i=0; i<8; i++) {
-      node_loc_to_gbl[i] = index_correction[fePtr->elementPtr()->vertexGlobal(i)];
-      node_loc_to_bc[i] = bc_correction[fePtr->elementPtr()->vertexGlobal(i)];
-    }
-
-    for (int iEdge=0; iEdge<12; iEdge++) {
-      int iEdge_global = fePtr->elementPtr()->edgeGlobal(iEdge);
-      for (int jDoF=0; jDoF<param.dsSpace.degPolyn()-1; jDoF++) {
-        node_loc_to_gbl[8 + iEdge*(param.dsSpace.degPolyn()-1) + jDoF] = index_correction[param.dsSpace.nVertexDoFs() + iEdge_global*(param.dsSpace.degPolyn()-1) + jDoF];
-        node_loc_to_bc[8 + iEdge*(param.dsSpace.degPolyn()-1) + jDoF] = bc_correction[param.dsSpace.nVertexDoFs() + iEdge_global*(param.dsSpace.degPolyn()-1) + jDoF];
-      }
-    }
-
-    if (fePtr->nFaceDoFs()>0) {
-      for (int iFace=0; iFace<6; iFace++) {
-        int iFace_global = fePtr->elementPtr()->faceGlobal(iFace);
-        for (int jDoF=0; jDoF<fePtr->nFaceDoFs()/6; jDoF++) {
-          node_loc_to_gbl[8 + 12*(param.dsSpace.degPolyn()-1) + iFace*fePtr->nFaceDoFs()/6 + jDoF] = index_correction[param.dsSpace.nVertexDoFs() + param.dsSpace.nEdgeDoFs() + iFace_global*fePtr->nFaceDoFs()/6 + jDoF];
-          node_loc_to_bc[8 + 12*(param.dsSpace.degPolyn()-1) + iFace*fePtr->nFaceDoFs()/6 + jDoF] = bc_correction[param.dsSpace.nVertexDoFs() + param.dsSpace.nEdgeDoFs() + iFace_global*fePtr->nFaceDoFs()/6 + jDoF];
-        }
-      }
-    }
-
-    if (fePtr->nCellDoFs()>0) {
-      int iCell_global = fePtr->elementPtr()->meshIndex();
-      for (int jDoF=0; jDoF<fePtr->nCellDoFs(); jDoF++) {
-        node_loc_to_gbl[8 + 12*(param.dsSpace.degPolyn()-1) + fePtr->nFaceDoFs() + jDoF] = index_correction[param.dsSpace.nVertexDoFs() + param.dsSpace.nEdgeDoFs() + param.dsSpace.nFaceDoFs() + iCell_global*fePtr->nCellDoFs() + jDoF];
-        node_loc_to_gbl[8 + 12*(param.dsSpace.degPolyn()-1) + fePtr->nFaceDoFs() + jDoF] = -1;
-      }
+    for (int i=0; i<nn_loc; i++) {
+      node_loc_to_gbl[i] = param.dsSpace.indexCorrection(fePtr->globalDoF(i));
+      node_loc_to_bc[i] = param.dsSpace.bcCorrection(fePtr->globalDoF(i));
     }
 
     // Matrix and rhs assembly over elements
@@ -222,8 +189,15 @@ int EllipticPDE::solve(Monitor& monitor) {
       if (node_loc_to_gbl[jNode] != -1) {
         for(int iNode=0; iNode<nn_loc; iNode++) {
           if (node_loc_to_gbl[iNode] != -1) {
-            mat[node_loc_to_gbl[iNode] + nn*node_loc_to_gbl[jNode]]
-              += mat_loc[iNode + nn_loc*jNode];
+            // get the global index in Ax
+            int global_index = 0;
+            for (int possible_index=Ap[node_loc_to_gbl[iNode]]; possible_index<Ap[node_loc_to_gbl[iNode]+1]; possible_index++) {
+              if (node_loc_to_gbl[jNode] == Ai[possible_index]) {
+                global_index = possible_index;
+                break;
+              }
+            }
+            Ax[global_index] += mat_loc[iNode + nn_loc*jNode];
           }
         }
       }
@@ -231,68 +205,46 @@ int EllipticPDE::solve(Monitor& monitor) {
 
     for(int iNode=0; iNode<nn_loc; iNode++) {
       if (node_loc_to_gbl[iNode] != -1) {
-        rhs[node_loc_to_gbl[iNode]] += rhs_loc[iNode];
+        b[node_loc_to_gbl[iNode]] += rhs_loc[iNode];
       }
     }
   }
 
-  std::ofstream fout("test/matrix.txt");
-  fout.precision(24);
-  for(int j=0; j<nn; j++) {
-    for(int i=0; i<nn; i++) {
-      fout << mat[i + nn*j] << "\t";
-    }
-    if (j < nn - 1) fout << "\n";
-  }
-
-
-  std::ofstream rout("test/rhs.txt");
-  rout.precision(24);
-  for(int i=0; i<nn; i++) {
-    rout << rhs[i];
-    if (i < nn - 1) rout << "\n";
-  }
-
-
-
   monitor(1,"===============================================");
-  monitor(1,"===Solution of linear system (DIRECT SOLVER)==="); ////////////////////////////////////////
+  monitor(1,"===Solution of linear system (SPARSE SOLVER)==="); ////////////////////////////////////////
   monitor(1,"===============================================");
   
-  //Solve the matrix, result would be stored in rhs
-  lapack_int* ipiv; char norm = 'I'; 
-  ipiv = (lapack_int*)malloc(nn * sizeof(lapack_int));
-  double anorm = LAPACKE_dlange(LAPACK_ROW_MAJOR, norm, nn, nn, mat, nn);
-  int ierr = LAPACKE_dgesv(LAPACK_ROW_MAJOR, nn, 1, mat, nn, ipiv, rhs, 1); //mat updated to be LU
-  if(ierr) { // ?? what should we do ???
-    std::cerr << "ERROR: Lapack failed with code " << ierr << std::endl; 
+  double *null = (double *) NULL ;
+  void *Symbolic, *Numeric ;
+  
+  int error_sym = umfpack_di_symbolic(nn, nn, Ap.data(), Ai.data(), Ax.data(), &Symbolic, null, null);
+  if (error_sym != 0) {
+    std::cout << "ERROR: umfpack_di_symbolic with error code " << error_sym << std::endl;
   }
-  double rcond = 0;
-  ierr = LAPACKE_dgecon(LAPACK_ROW_MAJOR, norm, nn, mat, nn, anorm, &rcond);
-  if(ierr) { // ?? what should we do ???
-    std::cerr << "ERROR: Lapack failed with code " << ierr << std::endl; 
+  int error_num =  umfpack_di_numeric(Ap.data(), Ai.data(), Ax.data(), Symbolic, &Numeric, null, null);
+  if (error_num != 0) {
+    std::cout << "ERROR: umfpack_di_numeric with error code " << error_num << std::endl;
   }
-  rcond = 1/rcond;
-  free(ipiv);
+  umfpack_di_free_symbolic(&Symbolic);
+  
+  int error_sol = umfpack_di_solve(UMFPACK_A, Ap.data(), Ai.data(), Ax.data(), x.data(), b.data(), Numeric, null, null) ;
+  if (error_sol != 0) {
+    std::cout << "ERROR: umfpack_di_solve with error code " << error_sol << std::endl;
+  }
+  umfpack_di_free_numeric(&Numeric);
 
   std::ofstream sout("test/solution.txt");
   sout.precision(24);
   for(int i=0; i<nn; i++) {
-    sout << rhs[i];
+    sout << x[i];
     if (i < nn - 1) sout << "\n";
   }
 
-  //Calculate inf condition number
- 
-  std::cout << "\tNorm Format:\t" << norm << std::endl;
-  std::cout << "\tNorm of mat:\t" << anorm << std::endl;
-  std::cout << "\tCond number:\t" << rcond << std::endl;
-
   for(int i=0; i<solution.size(); i++) {
-    if(index_correction[i] == -1) {
-      solution[i] = bc_vals[bc_correction[i]];
+    if(param.dsSpace.indexCorrection(i) == -1) {
+      solution[i] = bc_vals[param.dsSpace.bcCorrection(i)];
     } else {
-      solution[i] = rhs[index_correction[i]];
+      solution[i] = x[param.dsSpace.indexCorrection(i)];
     }
   }
 
@@ -330,56 +282,6 @@ int EllipticPDE::solve(Monitor& monitor) {
     std::cout << "  Relative L_2 Error:      " << l2Error/l2Norm << std::endl;
     std::cout << "  Relative L_2 Grad Error: " << l2GradError/l2GradNorm << std::endl;
     std::cout << std::endl;
-
-    if(param.output_soln_DS_format > 0) {
-
-      monitor(1,"Write Interpolation Solution, only work for polynomial degree r < 6\n"); ////////////////////////////////////////////
-
-      DirectSerendipityArray u(&(param.dsSpace));
-
-      for(int i=0; i<u.size(); i++) {
-        if (i<param.dsSpace.nVertexDoFs()) {
-          Vertex* v = param.mesh.vertexPtr(i);
-          u[i] = trueSoln(v->val(0),v->val(1),v->val(2));
-        } else if (i<param.dsSpace.nVertexDoFs()+param.dsSpace.nEdgeDoFs()) {
-          Point* pt = param.dsSpace.edgeNodePtr(i-param.dsSpace.nVertexDoFs());
-          u[i] = trueSoln(pt->val(0),pt->val(1),pt->val(2));
-        } else {
-          Point* pt = param.dsSpace.faceDoFPtr(i-param.dsSpace.nVertexDoFs()-param.dsSpace.nEdgeDoFs());
-          u[i] = trueSoln(pt->val(0),pt->val(1),pt->val(2));
-        }
-      }
-
-      param.dsSpace.nodeModification(u.theArray());
-
-      double l2InterpError = 0, l2InterpGradError = 0, l2InterpNorm = 0, l2InterpGradNorm = 0;
-      u.l2normError(l2InterpError, l2InterpGradError, l2InterpNorm, l2InterpGradNorm, param.refinement_level, trueSoln, trueGradSoln);
-
-      std::cout << "  L_2 Interpolation Error:      " << l2InterpError << std::endl;
-      std::cout << "  L_2 Interpolation Grad Error: " << l2InterpGradError << std::endl;
-      std::cout << std::endl;
-      std::cout << "  Relative L_2 Interpolation Error:      " << l2InterpError/l2InterpNorm << std::endl;
-      std::cout << "  Relative L_2 Interpolation Grad Error: " << l2InterpGradError/l2InterpGradNorm << std::endl;
-      std::cout << std::endl;
-
-      switch(param.output_soln_DS_format) {
-      case 1: {
-        std::string fileName(param.directory_name);
-        fileName += "interpolation_raw";
-        u.write_raw(fileName);
-        break;
-      }
-      case 2: {
-        std::string fileName(param.directory_name);
-        fileName += "interpolation_mesh";
-        std::string fileNameGrad(param.directory_name);
-        fileNameGrad += "interpolation_grad_mesh";
-        u.write_tecplot_mesh(fileName,fileNameGrad,
-        param.output_mesh_numPts_DS_x,param.output_mesh_numPts_DS_y,param.output_mesh_numPts_DS_z);
-        break;
-      }
-      }
-    }
   }
   return 0;
 }

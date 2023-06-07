@@ -13,6 +13,7 @@
 #include "Mesh/baseObjects.h"
 #include "Mesh/hexaMesh.h"
 #include "fcns.h"
+#include <array>
 
 namespace directserendipity {
 
@@ -103,6 +104,7 @@ namespace directserendipity {
     int deg_cell_poly; // Redundant with above
     int num_cell_dofs; // Redundant with above
     int num_dofs; // Redundant with above
+    int* global_dofs = nullptr;
 
     // coefficients for face shape functions varphi_{n,s} to form 
     // a linear combination to serve as nodal basis functions
@@ -158,6 +160,7 @@ namespace directserendipity {
     int nFaceDoFs() const { return num_face_dofs; };
     int nCellDoFs() const { return num_cell_dofs; };
     int nDoFs() const { return num_dofs; };
+    int globalDoF(int i) const { return global_dofs[i]; };
 
     // The expected value on each edge - bubble*chebyshev
     double edgeCheby(int iEdge, int nPt, int s);
@@ -231,6 +234,8 @@ namespace directserendipity {
     int num_dofs;
     int num_dofs_per_face;
     int num_dofs_per_cell;
+    int num_interior_dofs;
+    int num_bc_dofs;
 
     Point* edge_nodes = nullptr;
     Point* face_dofs = nullptr;
@@ -240,11 +245,15 @@ namespace directserendipity {
     double* edge_cheby = nullptr;
     int* bc_edge_index = nullptr;
 
+    double* index_correction = nullptr;
+    double* bc_correction = nullptr;
+    std::vector<std::array<int,2>> nonzero_entries;
+
     void set_directserendipity(int polyDeg, int suppType, hexamesh::HexaMesh* mesh);
     
   public:
     DirectSerendipity() : polynomial_degree(0), supplement_type(0), my_mesh(nullptr), num_dofs(0), num_dofs_per_face(0), num_dofs_per_cell(0), 
-			  face_dofs(nullptr), the_ds_elements(nullptr) {};
+			  num_interior_dofs(0), num_bc_dofs(0), face_dofs(nullptr), the_ds_elements(nullptr), nonzero_entries() {};
     DirectSerendipity(int polyDeg, int suppType, hexamesh::HexaMesh* mesh) {
       set_directserendipity(polyDeg, suppType, mesh); };
     ~DirectSerendipity();
@@ -262,6 +271,8 @@ namespace directserendipity {
     int nFaceDoFs() const { return my_mesh->nFaces() * nSingleFaceDoFs(); };
     int nSingleCellDoFs() const { return num_dofs_per_cell; };
     int nCellDoFs() const { return my_mesh->nElements() * nSingleCellDoFs(); };
+    int nInteriorDoFs() const { return num_interior_dofs; };
+    int nBCDoFs() const { return num_bc_dofs; };
 
     DirectSerendipityFE* finiteElementPtr(int i) const { return &the_ds_elements[i]; };
     Point* faceDoFPtr(int nFace, int iDoF) const { return &face_dofs[nFace*num_dofs_per_face+iDoF]; };
@@ -269,6 +280,10 @@ namespace directserendipity {
     Point* faceDoFPtr(int iDoF) const { return &face_dofs[iDoF]; };
     Point* edgeNodePtr(int iDoF) const { return &edge_nodes[iDoF]; };
     bool isInterior(int iDoF) const { return is_interior[iDoF]; };
+
+    std::vector<std::array<int,2>>* indicesPtr() { return &nonzero_entries; };
+    int indexCorrection(int iDoF) const { return index_correction[iDoF]; };
+    int bcCorrection(int iDoF) const { return bc_correction[iDoF]; };
 
     // The expected value on each edge - bubble*chebyshev
     double edgeCheby(int iEdge, int nPt, int s) { return edge_cheby[iEdge*(polynomial_degree-1)*(polynomial_degree-1) + nPt*(polynomial_degree-1) + s]; };

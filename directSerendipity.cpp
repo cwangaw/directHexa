@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <assert.h>
 #include "lapacke.h"
+#include <bits/stdc++.h>
 
 using namespace std;
 
@@ -538,6 +539,71 @@ void DirectSerendipity::set_directserendipity(int polyDeg, int suppType, HexaMes
       index++;      
     }
   }
+
+  // set up index correction and bc correction
+  if (index_correction) delete[] index_correction;
+  index_correction = new double[num_dofs];
+
+  if (bc_correction) delete[] bc_correction;
+  bc_correction = new double[num_dofs];
+
+  int nn = 0, mm = 0;
+  for (int i = 0; i < num_dofs; i++) {
+    if (is_interior[i]) {
+      bc_correction[i] = -1;
+      index_correction[i] = nn;
+      nn++;
+    } else {
+      index_correction[i] = -1;
+      bc_correction[i] = mm;
+      mm++;
+    }
+  }
+  num_interior_dofs = nn;
+  num_bc_dofs = mm;
+
+  // set up nonzero entries stored columnwise
+  nonzero_entries.clear();
+
+  // store all the possible entries by looping through elements
+  std::vector<std::array<int,2>> nonzero_entries_collection;
+  nonzero_entries_collection.clear();
+
+  for (int nElement=0; nElement<mesh->nElements(); nElement++) {
+    int num_element_dof = the_ds_elements[nElement].nDoFs();
+    for (int iDoF=0; iDoF<num_element_dof; iDoF++) {
+      for (int jDoF=0; jDoF<num_element_dof; jDoF++) {
+        int iGlobalDoF = index_correction[the_ds_elements[nElement].globalDoF(iDoF)];
+        int jGlobalDoF = index_correction[the_ds_elements[nElement].globalDoF(jDoF)];
+        if (iGlobalDoF == -1 || jGlobalDoF == -1) continue;
+        std::array<int,2> global_tuple = {iGlobalDoF, jGlobalDoF};
+
+        // check repetition
+        bool is_repeat = 0;
+        for (unsigned int iArray=0; iArray<nonzero_entries_collection.size(); iArray++) {
+          if (nonzero_entries_collection[iArray][0] == global_tuple[0] && nonzero_entries_collection[iArray][1] == global_tuple[1]) is_repeat = 1;
+        }
+        if (!is_repeat) nonzero_entries_collection.push_back(global_tuple);
+      }
+    }
+  }
+
+  // sort the nonzero entries in ascending order (col first, then row)
+  for (int jCol=0; jCol<nn; jCol++) {
+    std::vector<int> nonzero_entries_row;
+    nonzero_entries_row.clear();
+    for (unsigned int iArray=0; iArray<nonzero_entries_collection.size(); iArray++) {
+      if (nonzero_entries_collection[iArray][1] == jCol) {
+        nonzero_entries_row.push_back(nonzero_entries_collection[iArray][0]);
+      }
+    }
+    sort(nonzero_entries_row.begin(), nonzero_entries_row.end());
+    for (unsigned int iArray=0; iArray<nonzero_entries_row.size(); iArray++) {
+      std::array<int,2> index_tuple = {nonzero_entries_row[iArray], jCol};
+      nonzero_entries.push_back(index_tuple);
+    }
+  }
+
 }
 
 DirectSerendipity::~DirectSerendipity() {
@@ -547,6 +613,8 @@ DirectSerendipity::~DirectSerendipity() {
   if (is_interior) delete[] is_interior;
   if (edge_cheby) delete[] edge_cheby;
   if (bc_edge_index) delete[] bc_edge_index;
+  if (index_correction) delete[] index_correction;
+  if (bc_correction) delete[] bc_correction;
 };
 
 void DirectSerendipity::bcModification(double* bc_vals) {
