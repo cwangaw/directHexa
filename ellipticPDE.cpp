@@ -29,7 +29,7 @@ int EllipticPDE::solve(Monitor& monitor) {
 
   if(false) {
     monitor(1,"Test Quadrature Rules");
-    testQuadrature(&(param.mesh), param.supplement_type , param.refinement_level,1e-15);
+    testQuadrature(&(param.mesh), param.supplement_type , param.refinement_level,1e-14);
   }
 
   // TEST BASIS FUNCTION ///////////////////////////////////////////////////////
@@ -47,30 +47,18 @@ int EllipticPDE::solve(Monitor& monitor) {
     std::string fileNameGrad(param.directory_name);
     fileNameGrad += "test_grad_mesh";
     testingarray.write_tecplot_mesh(fileName,fileNameGrad,
-        param.output_mesh_numPts_DS_x,param.output_mesh_numPts_DS_y,param.output_mesh_numPts_DS_z);
+       param.output_mesh_numPts_DS_x,param.output_mesh_numPts_DS_y,param.output_mesh_numPts_DS_z);
   }
 
   // DEBUG ///////////////////////////////////////////////////////////
 
   if (false) {
-    int num_intervals = 10;
-    double dx = (param.mesh.xMax() - param.mesh.xMin()) / num_intervals;
-    double dy = (param.mesh.yMax() - param.mesh.yMin()) / num_intervals;
-    double dz = (param.mesh.zMax() - param.mesh.zMin()) / num_intervals;
-    for (int i=0; i<10; i++) {
-      for (int j=0; j<10; j++) {
-        for (int k=0; k<10; k++) {
-          Point pt(param.mesh.xMin()+i*dx, param.mesh.xMin()+j*dy, param.mesh.xMin()+k*dz);
-          int n = param.mesh.inElement(pt);
-          Point pt_orig = param.mesh.elementPtr(n)->backwardMap(pt);
-          Tensor1 res = pt-param.mesh.elementPtr(n)->forwardMap(pt_orig);
-          if (res.norm()>1e-8) {
-            std::cout << "residual of mapping (" << pt << "):" << res << std::endl; 
-          }
-        }
-      }
+    DirectSerendipityArray testingarray(&(param.dsSpace));
+    for(int i=0; i<param.mesh.nVertices(); i++) {
+      testingarray[i] = 0;  
     }
   }
+    
 
   // SOLVE THE PDE ///////////////////////////////////////////////////////////
   
@@ -125,7 +113,7 @@ int EllipticPDE::solve(Monitor& monitor) {
   double* rhs = rhs_vector.data();
 
   // quadrature points
-  quadrature::Quadrature quadRule(8);
+  quadrature::Quadrature quadRule(10);
 
   monitor(1,"Matrix and RHS Assembly"); ////////////////////////////////////////
 

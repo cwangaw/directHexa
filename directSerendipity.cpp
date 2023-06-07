@@ -292,7 +292,6 @@ void DirectSerendipityArray::write_tecplot_mesh(std::ofstream* fout, std::ofstre
   double dz = (zMax - zMin)/(num_pts_z-1);
 
   Point* pts = new Point[num_pts_x*num_pts_y*num_pts_z];
-  Point* vertices = new Point[my_ds_space->mesh()->nVertices()];
   
   for(int i=0; i<num_pts_x; i++) {
     for(int j=0; j<num_pts_y; j++) {
@@ -302,19 +301,12 @@ void DirectSerendipityArray::write_tecplot_mesh(std::ofstream* fout, std::ofstre
     }
   }
 
-  for(int i=0; i<my_ds_space->mesh()->nVertices(); i++) {
-    vertices[i] = *my_ds_space->mesh()->vertexPtr(i);
-  }
 
   // Evaluate
   double result[num_pts_x*num_pts_y*num_pts_z];
-  double vertexResult[my_ds_space->mesh()->nVertices()];
   Tensor1* gradResult = new Tensor1[num_pts_x*num_pts_y*num_pts_z];
-  Tensor1* vertexGradResult = new Tensor1[my_ds_space->mesh()->nVertices()];
 
   eval(pts, result, gradResult, num_pts_x*num_pts_y*num_pts_z);
-  eval(vertices, vertexResult, vertexGradResult, my_ds_space->mesh()->nVertices());
-
   // Write file  
   *fout << "TITLE = \"Direct serendipity array output\"\n";
   *fout << "VARIABLES = \"X\", \"Y\", \"Z\", \"value\"\n";
@@ -336,51 +328,9 @@ void DirectSerendipityArray::write_tecplot_mesh(std::ofstream* fout, std::ofstre
     }
   }
 
-  *fout << "ZONE NODES=" << my_ds_space->mesh()->nVertices() << ", ELEMENTS=" << my_ds_space->mesh()->nElements() << ", DATAPACKING=BLOCK, ZONETYPE=FEBRICK\n";
-
-  for(int i=0; i<my_ds_space->mesh()->nVertices(); i++) {
-    *fout << my_ds_space->mesh()->vertexPtr(i)->val(0) << " ";
-    if(fout_grad) *fout_grad << my_ds_space->mesh()->vertexPtr(i)->val(0) << " ";
-  }
-  *fout << "\n";
-  if(fout_grad) *fout_grad << "\n";
-
-  for(int i=0; i<my_ds_space->mesh()->nVertices(); i++) {
-    *fout << my_ds_space->mesh()->vertexPtr(i)->val(1) << " ";
-    if(fout_grad) *fout_grad << my_ds_space->mesh()->vertexPtr(i)->val(1) << " ";
-  }
-  *fout << "\n";
-  if(fout_grad) *fout_grad << "\n";
-
-  for(int i=0; i<my_ds_space->mesh()->nVertices(); i++) {
-    *fout << my_ds_space->mesh()->vertexPtr(i)->val(2) << " ";
-    if(fout_grad) *fout_grad << my_ds_space->mesh()->vertexPtr(i)->val(2) << " ";
-  }
-  *fout <<  "\n";
-  if(fout_grad) *fout_grad << "\n";
-
-  for(int i=0; i<my_ds_space->mesh()->nVertices(); i++) {
-    *fout << vertexResult[i] << " ";
-  }
-  *fout <<  "\n";
-  if(fout_grad) *fout_grad << "\n";
-
-  for (int n=0; n<my_ds_space->mesh()->nElements(); n++) {
-    Element* the_element = my_ds_space->mesh()->elementPtr(n);
-    *fout << the_element->vertexGlobal(4)+1 << " " << the_element->vertexGlobal(6)+1 << " " << the_element->vertexGlobal(2)+1 << " " << the_element->vertexGlobal(0)+1 << " "
-          << the_element->vertexGlobal(5)+1 << " " << the_element->vertexGlobal(7)+1 << " " << the_element->vertexGlobal(3)+1 << " " << the_element->vertexGlobal(1)+1 << " ";
-    *fout << "\n";
-    if(fout_grad) {
-    *fout_grad << the_element->vertexGlobal(4)+1 << " " << the_element->vertexGlobal(6)+1 << " " << the_element->vertexGlobal(2)+1 << " " << the_element->vertexGlobal(0)+1 << " "
-               << the_element->vertexGlobal(5)+1 << " " << the_element->vertexGlobal(7)+1 << " " << the_element->vertexGlobal(3)+1 << " " << the_element->vertexGlobal(1)+1 << " ";
-    *fout_grad << "\n";
-    }
-  }
-
+ 
   delete[] pts;
-  delete[] vertices;
   delete[] gradResult;
-  delete[] vertexGradResult;
 
   return;
 };

@@ -131,6 +131,7 @@ class Tensor2 {
   double  operator() (int i, int j) const { return the_tensor[i % 3][j % 3]; }
   double& val(int i, int j)               { return the_tensor[i % 3][j % 3]; }
   double  val(int i, int j)         const { return the_tensor[i % 3][j % 3]; }
+  Tensor1 col(int j)                      { return Tensor1(the_tensor[0][j % 3], the_tensor[1][j % 3], the_tensor[2][j % 3]); };
 
   bool operator==(const Tensor2& t) const { return
       the_tensor[0][0]==t.the_tensor[0][0] && the_tensor[0][1]==t.the_tensor[0][1] && the_tensor[0][2]==t.the_tensor[0][2] &&

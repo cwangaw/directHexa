@@ -8,21 +8,21 @@ t		      # meshType ('o' = regularly deviated in one direction (x),
 0,1        	  # xMin,xMax
 0,1        	  # yMin,yMax 
 0,1        	  # zMin,zMax 
-12,12,12	    # nx,ny,nz
-0           # distortion factor
+2,2,2	    # nx,ny,nz
+0.1           # distortion factor
 
 ### FINITE ELEMENTS ###########################################################
 
-4     	      # polynomial degree
-1             # type of supplemental function (0=piecewise polynomial with T_D, 1=piecewise polynomial with T_M, 2=smooth)
+1     	      # polynomial degree
+2             # type of supplemental function (0=piecewise polynomial with T_D, 1=piecewise polynomial with T_M, 2=smooth)
 0             # refinement level for quadrature
 
 ### OUTPUT PARAMETERS ########################################################
 
 2			        # Output DS solution (-1=omit, 0=none, 1=raw, 2=tecplot)
-21,21,21   # numPtsDS_x,numPtsDS_y,numPtsDS_z number of x,y,z points for tecplot
+21,21,21      # numPtsDS_x,numPtsDS_y,numPtsDS_z number of x,y,z points for tecplot
 
-1			        # Mesh output format (0=none, 1=raw, 2=matlab)
+2			        # Mesh output format (0=none, 1=raw, 2=matlab)
 2			        # DS space output format (0=none, 1=raw, 2=tecplot)
 
 #MONITORING

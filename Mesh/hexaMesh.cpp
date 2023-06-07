@@ -407,7 +407,8 @@ void Element::dForwardMap(const Point& p, Tensor2& df, double& jac) {
     );
 
   df.set(col[0][0],col[1][0],col[2][0],col[0][1],col[1][1],col[2][1],col[0][2],col[1][2],col[2][2]);
-  jac = abs(df.determinant());
+  jac = std::abs(df.determinant());
+  return;
 }
 
 bool Element::isInElement(const Point& pt) {

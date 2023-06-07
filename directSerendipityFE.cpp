@@ -308,7 +308,6 @@ double DirectSerendipityFE::edgeCheby(int iEdge, int nPt, int s) {
 }
 
 void DirectSerendipityFE::specFunc(int dir, const Point& pt, double& value, Tensor1& gradvalue) {
-  assert(dir>=0 && dir <=2);
   switch(my_ds_space->supplementType()) {
   case 0: case 1: {
     // piecewise polynomial with T_D or T_M
@@ -378,7 +377,6 @@ void DirectSerendipityFE::specFunc(int dir, const Point& pt, double& value, Tens
 }
 
 void DirectSerendipityFE::edgePsi(int dir, const Point& pt, double& value, Tensor1& gradvalue) {
-  assert(dir>=0 && dir <=2);
   switch (my_ds_space->supplementType()) {
   case 0: case 1: {
     // piecewise polynomial with T_D and T_M
@@ -485,34 +483,55 @@ void DirectSerendipityFE::edgePsi(int dir, const Point& pt, double& value, Tenso
       case 0: {
         eval_p0 = my_element->forwardMap(Point(p_orig[0],1,p_orig[2])); //y
         my_element->dForwardMap(Point(p_orig[0],1,p_orig[2]),dftemp,jactemp);
-        chain0 *= Tensor2(1,0,0,0,0,0,0,0,1); chain0 *= dftemp;
+
+        chain0 = dftemp;
+        chain0 *= Tensor2(1,0,0,0,0,0,0,0,1);
+        chain0 *= df_inv;
+
         eval_p1 = my_element->forwardMap(Point(p_orig[0],p_orig[1],1)); //z
         my_element->dForwardMap(Point(p_orig[0],p_orig[1],1),dftemp,jactemp);
-        chain1 *= Tensor2(1,0,0,0,1,0,0,0,0); chain1 *= dftemp;
+
+        chain1 = dftemp;
+        chain1 *= Tensor2(1,0,0,0,1,0,0,0,0); 
+        chain1 *= df_inv;
         break;
       }
       case 1: {
         eval_p0 = my_element->forwardMap(Point(p_orig[0],p_orig[1],1)); //z
         my_element->dForwardMap(Point(p_orig[0],p_orig[1],1),dftemp,jactemp);
-        chain0 *= Tensor2(1,0,0,0,1,0,0,0,0); chain0 *= dftemp;
+
+        chain0 = dftemp;
+        chain0 *=  Tensor2(1,0,0,0,1,0,0,0,0);
+        chain0 *= df_inv;
+
         eval_p1 = my_element->forwardMap(Point(1,p_orig[1],p_orig[2])); //x
         my_element->dForwardMap(Point(1,p_orig[1],p_orig[2]),dftemp,jactemp);
-        chain1 *= Tensor2(0,0,0,0,1,0,0,0,1); chain1 *= dftemp;
+
+        chain1 = dftemp;
+        chain1 *= Tensor2(0,0,0,0,1,0,0,0,1); 
+        chain1 *= df_inv;
         break;
       }
       case 2: {
         eval_p0 = my_element->forwardMap(Point(1,p_orig[1],p_orig[2])); //x
         my_element->dForwardMap(Point(1,p_orig[1],p_orig[2]),dftemp,jactemp);
-        chain0 *= Tensor2(0,0,0,0,1,0,0,0,1); chain0 *= dftemp;
+
+        chain0 = dftemp;
+        chain0 *=  Tensor2(0,0,0,0,1,0,0,0,1);
+        chain0 *= df_inv;
+
         eval_p1 = my_element->forwardMap(Point(p_orig[0],1,p_orig[2])); //y
         my_element->dForwardMap(Point(p_orig[0],1,p_orig[2]),dftemp,jactemp);
-        chain1 *= Tensor2(1,0,0,0,0,0,0,0,1); chain1 *= dftemp;
+
+        chain1 = dftemp;
+        chain1 *= Tensor2(1,0,0,0,0,0,0,0,1); 
+        chain1 *= df_inv;
         break;
       }
     }
 
-    specFunc((dir+2)%3,pt,R0,gradR0);
-    specFunc((dir+1)%3,pt,R1,gradR1);
+    specFunc((dir+2)%3,eval_p0,R0,gradR0);
+    specFunc((dir+1)%3,eval_p1,R1,gradR1);
 
     getAB((dir+2)%3*2,dir*2,iEdge,A0,B0);
     getAB((dir+1)%3*2,dir*2,iEdge,A1,B1);
@@ -521,8 +540,11 @@ void DirectSerendipityFE::edgePsi(int dir, const Point& pt, double& value, Tenso
     double psi1 = (my_element->lambda((dir+1)%3*2,eval_p1)-0.5*B1*my_element->lambda(dir*2,eval_p1)*(1+R1))/A1;
 
     value = psi0 * psi1;
-    gradvalue = (chain0 * (my_element->dLambda((dir+2)%3*2)-0.5*B0*(my_element->dLambda(dir*2)*(1+R0)+my_element->lambda(dir*2,eval_p0)*gradR0))/A0) * psi1
-              + (chain1 * (my_element->dLambda((dir+1)%3*2)-0.5*B1*(my_element->dLambda(dir*2)*(1+R1)+my_element->lambda(dir*2,eval_p1)*gradR1))/A1) * psi0;
+
+    Tensor1 gradpsi0((my_element->dLambda((dir+2)%3*2)-0.5*B0*(my_element->dLambda(dir*2)*(1+R0)+my_element->lambda(dir*2,eval_p0)*gradR0))/A0);
+    Tensor1 gradpsi1((my_element->dLambda((dir+1)%3*2)-0.5*B1*(my_element->dLambda(dir*2)*(1+R1)+my_element->lambda(dir*2,eval_p1)*gradR1))/A1);
+    gradvalue = Tensor1(gradpsi0*chain0.col(0), gradpsi0*chain0.col(1), gradpsi0*chain0.col(2)) * psi1
+              + Tensor1(gradpsi1*chain1.col(0), gradpsi1*chain1.col(1), gradpsi1*chain1.col(2)) * psi0;
 
     break;
   }
@@ -862,7 +884,6 @@ void DirectSerendipityFE::write_tecplot(std::ofstream* fout, std::ofstream* fout
   double dz = (z_max - z_min)/(num_pts_z-1);
 
   Point* pts = new Point[num_pts_x*num_pts_y*num_pts_z];
-  Point* vertices = new Point[8];
 
   for(int i=0; i<num_pts_x; i++) {
     for(int j=0; j<num_pts_y; j++) {
@@ -872,17 +893,12 @@ void DirectSerendipityFE::write_tecplot(std::ofstream* fout, std::ofstream* fout
     }
   }
 
-  for(int i=0; i<8; i++) {
-    vertices[i] = *my_element->vertexPtr(i);
-  }
 
   // Evaluate
   double result[num_pts_x*num_pts_y*num_pts_z];
-  double vertexResult[8];
   Tensor1* gradResult = new Tensor1[num_pts_x*num_pts_y*num_pts_z];
-  Tensor1* vertexGradResult = new Tensor1[8];
+
   eval(pts, result, gradResult, num_pts_x*num_pts_y*num_pts_z, vertex_dofs, edge_dofs, face_dofs, cell_dofs);
-  eval(vertices, vertexResult, vertexGradResult, 8, vertex_dofs, edge_dofs, face_dofs, cell_dofs);
 
   // Modify the evaluation of the points outside the element to be zero
   for(int i=0; i<num_pts_x; i++) {
@@ -917,50 +933,8 @@ void DirectSerendipityFE::write_tecplot(std::ofstream* fout, std::ofstream* fout
     }
   }
 
-
-  *fout << "ZONE NODES=" << 8 << ", ELEMENTS=" << 1 << ", DATAPACKING=BLOCK, ZONETYPE=FEBRICK\n";
-  for(int i=0; i<8; i++) {
-    *fout <<my_element->vertexPtr(i)->val(0) << " ";
-    if(fout_grad) *fout_grad << my_element->vertexPtr(i)->val(0) << " ";
-  }
-  *fout << "\n";
-  if(fout_grad) *fout_grad << "\n";
-
-  for(int i=0; i<8; i++) {
-    *fout << my_element->vertexPtr(i)->val(1) << " ";
-    if(fout_grad) *fout_grad << my_element->vertexPtr(i)->val(1) << " ";
-  }
-  *fout << "\n";
-  if(fout_grad) *fout_grad << "\n";
-
-  for(int i=0; i<8; i++) {
-    *fout << my_element->vertexPtr(i)->val(2) << " ";
-    if(fout_grad) *fout_grad << my_element->vertexPtr(i)->val(2) << " ";
-  }
-  *fout <<  "\n";
-  if(fout_grad) *fout_grad << "\n";
-
-  for(int i=0; i<8; i++) {
-    *fout << vertexResult[i] << " ";
-  }
-  *fout <<  "\n";
-  if(fout_grad) *fout_grad << "\n";
-
-
-  *fout << my_element->vertexGlobal(4) << " " << my_element->vertexGlobal(6) << " " << my_element->vertexGlobal(2) << " " << my_element->vertexGlobal(0) << " "
-        << my_element->vertexGlobal(5) << " " << my_element->vertexGlobal(7) << " " << my_element->vertexGlobal(3) << " " << my_element->vertexGlobal(1) << " ";
-  *fout << "\n";
-  if(fout_grad) {
-  *fout_grad << my_element->vertexGlobal(4) << " " << my_element->vertexGlobal(6) << " " << my_element->vertexGlobal(2) << " " << my_element->vertexGlobal(0) << " "
-              << my_element->vertexGlobal(5) << " " << my_element->vertexGlobal(7) << " " << my_element->vertexGlobal(3) << " " << my_element->vertexGlobal(1) << " ";
-  *fout_grad << "\n";
-  }
-
-
   delete[] gradResult;
-  delete[] vertexGradResult;
   delete[] pts;
-  delete[] vertices;
 }
 
 int DirectSerendipityFE::write_tecplot(std::string& filename, std::string& filename_grad,
