@@ -634,7 +634,6 @@ void DirectSerendipityFE::initBasis(const Point* pt, int num_pts) {
                 value *= my_element->lambda(iFace,pt[pt_index]);
               }
               value_n[pt_index*nDoFs()+nVertexDoFs()+nEdgeDoFs()+nFaceDoFs()+iCellDoF] = value;
-
               Tensor1 gradvalue = my_element->lambda(3,pt[pt_index])*my_element->lambda(5,pt[pt_index]) * my_element->dLambda(1)
                                 + my_element->lambda(1,pt[pt_index])*my_element->lambda(5,pt[pt_index]) * my_element->dLambda(3)
                                 + my_element->lambda(1,pt[pt_index])*my_element->lambda(3,pt[pt_index]) * my_element->dLambda(5);
@@ -646,8 +645,8 @@ void DirectSerendipityFE::initBasis(const Point* pt, int num_pts) {
                            +(m+1)*my_element->lambda(0,pt[pt_index])*my_element->lambda(4,pt[pt_index])*my_element->dLambda(2)
                            +(l+1)*my_element->lambda(0,pt[pt_index])*my_element->lambda(2,pt[pt_index])*my_element->dLambda(4));
               gradvalue_n[pt_index*nDoFs()+nVertexDoFs()+nEdgeDoFs()+nFaceDoFs()+iCellDoF] = gradvalue;
-              iCellDoF++;
             }
+            iCellDoF++;
           }
         }
       }
@@ -808,6 +807,7 @@ void DirectSerendipityFE::initBasis(const Point* pt, int num_pts) {
         gradvalue_n[pt_index*nDoFs()+nVertex] = gradvalue;
       }   
     }
+ 
   }
 }
 

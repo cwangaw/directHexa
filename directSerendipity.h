@@ -245,8 +245,8 @@ namespace directserendipity {
     double* edge_cheby = nullptr;
     int* bc_edge_index = nullptr;
 
-    double* index_correction = nullptr;
-    double* bc_correction = nullptr;
+    int* index_correction = nullptr;
+    int* bc_correction = nullptr;
     std::vector<std::array<int,2>> nonzero_entries;
 
     void set_directserendipity(int polyDeg, int suppType, hexamesh::HexaMesh* mesh);

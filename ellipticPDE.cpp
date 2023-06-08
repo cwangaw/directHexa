@@ -105,6 +105,7 @@ int EllipticPDE::solve(Monitor& monitor) {
     }
   }
   Ap[nn] = (*vec_ptr).size();
+
   // quadrature points
   quadrature::Quadrature quadRule(10);
 

@@ -542,10 +542,10 @@ void DirectSerendipity::set_directserendipity(int polyDeg, int suppType, HexaMes
 
   // set up index correction and bc correction
   if (index_correction) delete[] index_correction;
-  index_correction = new double[num_dofs];
+  index_correction = new int[num_dofs];
 
   if (bc_correction) delete[] bc_correction;
-  bc_correction = new double[num_dofs];
+  bc_correction = new int[num_dofs];
 
   int nn = 0, mm = 0;
   for (int i = 0; i < num_dofs; i++) {
@@ -564,6 +564,499 @@ void DirectSerendipity::set_directserendipity(int polyDeg, int suppType, HexaMes
 
   // set up nonzero entries stored columnwise
   nonzero_entries.clear();
+
+  for (int jDoF=0; jDoF<num_dofs; jDoF++) {
+    if (index_correction[jDoF]==-1) continue;
+    
+    // jDoF represents an interior vertex
+    if (jDoF<mesh->nVertices()) {
+      int vertex_pos[3];
+      mesh->vertexPos(jDoF,vertex_pos[0],vertex_pos[1],vertex_pos[2]);
+
+      // iDoF: vertices
+      for (int i=-1; i<=1; i++) {
+        for (int j=-1; j<=1; j++) {
+          for (int k=-1; k<=1; k++) {
+            int iDoF = mesh->vertexIndex(vertex_pos[0]+i,vertex_pos[1]+j,vertex_pos[2]+k);
+            if (index_correction[iDoF]!=-1) {
+              std::array<int,2> global_tuple = {index_correction[iDoF],index_correction[jDoF]};
+              nonzero_entries.push_back(global_tuple);
+            }
+          }
+        }
+      }
+
+      // iDoF: edge dofs
+      if (polynomial_degree>1) {
+        // z-dir edges
+        for (int i=-1; i<=1; i++) {
+          for (int j=-1; j<=1; j++) {
+            for (int k=-1; k<=0; k++) {
+              int iEdge = mesh->edgeIndex(2,vertex_pos[0]+i,vertex_pos[1]+j,vertex_pos[2]+k);
+              for (int iLocalDoF=0; iLocalDoF<polynomial_degree-1; iLocalDoF++) {
+                int iDoF = mesh->nVertices() + iEdge*(polynomial_degree-1) + iLocalDoF;
+                if (index_correction[iDoF]!=-1) {
+                  std::array<int,2> global_tuple = {index_correction[iDoF],index_correction[jDoF]};
+                  nonzero_entries.push_back(global_tuple);
+                }
+              }
+            }
+          }
+        }
+
+        // y-dir edges
+        for (int i=-1; i<=1; i++) {
+          for (int k=-1; k<=1; k++) {
+            for (int j=-1; j<=0; j++) {
+              int iEdge = mesh->edgeIndex(1,vertex_pos[0]+i,vertex_pos[1]+j,vertex_pos[2]+k);
+              for (int iLocalDoF=0; iLocalDoF<polynomial_degree-1; iLocalDoF++) {
+                int iDoF = mesh->nVertices() + iEdge*(polynomial_degree-1) + iLocalDoF;
+                if (index_correction[iDoF]!=-1) {
+                  std::array<int,2> global_tuple = {index_correction[iDoF],index_correction[jDoF]};
+                  nonzero_entries.push_back(global_tuple);
+                }
+              }
+            }
+          }
+        }
+
+        // x-dir edges
+        for (int j=-1; j<=1; j++) {
+          for (int k=-1; k<=1; k++) {
+            for (int i=-1; i<=0; i++) {
+              int iEdge = mesh->edgeIndex(0,vertex_pos[0]+i,vertex_pos[1]+j,vertex_pos[2]+k);
+              for (int iLocalDoF=0; iLocalDoF<polynomial_degree-1; iLocalDoF++) {
+                int iDoF = mesh->nVertices() + iEdge*(polynomial_degree-1) + iLocalDoF;
+                if (index_correction[iDoF]!=-1) {
+                  std::array<int,2> global_tuple = {index_correction[iDoF],index_correction[jDoF]};
+                  nonzero_entries.push_back(global_tuple);
+                }
+              }
+            }
+          }
+        }
+      }
+
+      // iDoF: face dofs
+      if (num_dofs_per_face>0) {
+        // yz-dir faces
+        for (int i=-1; i<=1; i++) {
+          for (int j=-1; j<=0; j++) {
+            for (int k=-1; k<=0; k++) {
+              int iFace = mesh->faceIndex(0,vertex_pos[0]+i,vertex_pos[1]+j,vertex_pos[2]+k);
+              for (int iLocalDoF=0; iLocalDoF<num_dofs_per_face; iLocalDoF++) {
+                int iDoF = mesh->nVertices() + mesh->nEdges()*(polynomial_degree-1) + iFace*num_dofs_per_face + iLocalDoF;
+                if (index_correction[iDoF]!=-1) {
+                  std::array<int,2> global_tuple = {index_correction[iDoF],index_correction[jDoF]};
+                  nonzero_entries.push_back(global_tuple);
+                }              
+              }
+            }
+          }
+        }
+
+        // xz-dir faces
+        for (int j=-1; j<=1; j++) {
+          for (int i=-1; i<=0; i++) {
+            for (int k=-1; k<=0; k++) {
+              int iFace = mesh->faceIndex(1,vertex_pos[0]+i,vertex_pos[1]+j,vertex_pos[2]+k);
+              for (int iLocalDoF=0; iLocalDoF<num_dofs_per_face; iLocalDoF++) {
+                int iDoF = mesh->nVertices() + mesh->nEdges()*(polynomial_degree-1) + iFace*num_dofs_per_face + iLocalDoF;
+                if (index_correction[iDoF]!=-1) {
+                  std::array<int,2> global_tuple = {index_correction[iDoF],index_correction[jDoF]};
+                  nonzero_entries.push_back(global_tuple);
+                }              
+              }
+            }
+          }
+        }
+
+        // xy-dir faces
+        for (int k=-1; k<=1; k++) {
+          for (int i=-1; i<=0; i++) {
+            for (int j=-1; j<=0; j++) {
+              int iFace = mesh->faceIndex(2,vertex_pos[0]+i,vertex_pos[1]+j,vertex_pos[2]+k);
+              for (int iLocalDoF=0; iLocalDoF<num_dofs_per_face; iLocalDoF++) {
+                int iDoF = mesh->nVertices() + mesh->nEdges()*(polynomial_degree-1) + iFace*num_dofs_per_face + iLocalDoF;
+                if (index_correction[iDoF]!=-1) {
+                  std::array<int,2> global_tuple = {index_correction[iDoF],index_correction[jDoF]};
+                  nonzero_entries.push_back(global_tuple);
+                }              
+              }
+            }
+          }
+        }
+      }
+      
+      // iDoF: cell dofs
+      if (num_dofs_per_cell>0) {
+        for (int i=-1; i<=0; i++) {
+          for (int j=-1; j<=0; j++) {
+            for (int k=-1; k<=0; k++) {
+              int iElement = mesh->elementIndex(vertex_pos[0]+i,vertex_pos[1]+j,vertex_pos[2]+k);
+              for (int iLocalDoF=0; iLocalDoF<num_dofs_per_cell; iLocalDoF++) {
+                int iDoF = mesh->nVertices() + mesh->nEdges()*(polynomial_degree-1) + mesh->nFaces()*num_dofs_per_face + iElement*num_dofs_per_cell + iLocalDoF;
+                if (index_correction[iDoF]!=-1) {
+                  std::array<int,2> global_tuple = {index_correction[iDoF],index_correction[jDoF]};
+                  nonzero_entries.push_back(global_tuple);
+                }
+              }
+            }
+          }
+        }        
+      }
+    } else if (jDoF<mesh->nVertices()+mesh->nEdges()*(polynomial_degree-1)) {
+      // jDoF is an edge dof
+      int jEdge = (jDoF-mesh->nVertices()) / (polynomial_degree-1);
+      Vertex* jV0 = mesh->edgeVertexPtr(0,jEdge);
+      Vertex* jV1 = mesh->edgeVertexPtr(1,jEdge);
+      int jDir = 0;
+      if (jV0->meshPos(1) != jV1->meshPos(1)) {
+        jDir = 1;
+      } else if (jV0->meshPos(2) != jV1->meshPos(2)) {
+        jDir = 2;
+      }
+
+      // iDoF: vertices
+      for (int i=-1; i<=1; i++) {
+        for (int j=-1; j<=1; j++) {
+          for (int k=-1; k<=1; k++) {
+            if (jDir==0 && i==-1) continue;
+            if (jDir==1 && j==-1) continue;
+            if (jDir==2 && k==-1) continue;
+            int iDoF = mesh->vertexIndex(jV0->meshPos(0)+i,jV0->meshPos(1)+j,jV0->meshPos(2)+k);
+            if (index_correction[iDoF]!=-1) {
+              std::array<int,2> global_tuple = {index_correction[iDoF],index_correction[jDoF]};
+              nonzero_entries.push_back(global_tuple);
+            }
+          }
+        }
+      }
+
+      // iDoF: edges
+      if (polynomial_degree>1) {
+        // z-dir edges
+        for (int i=-1; i<=1; i++) {
+          for (int j=-1; j<=1; j++) {
+            for (int k=-1; k<=0; k++) {
+              if (jDir==0 && i==-1) continue;
+              if (jDir==1 && j==-1) continue;
+              if (jDir==2 && k==-1) continue;
+              int iEdge = mesh->edgeIndex(2,jV0->meshPos(0)+i,jV0->meshPos(1)+j,jV0->meshPos(2)+k);
+              for (int iLocalDoF=0; iLocalDoF<polynomial_degree-1; iLocalDoF++) {
+                int iDoF = mesh->nVertices() + iEdge*(polynomial_degree-1) + iLocalDoF;
+                if (index_correction[iDoF]!=-1) {
+                  std::array<int,2> global_tuple = {index_correction[iDoF],index_correction[jDoF]};
+                  nonzero_entries.push_back(global_tuple);
+                }
+              }
+            }
+          }
+        }
+
+        // y-dir edges
+        for (int i=-1; i<=1; i++) {
+          for (int k=-1; k<=1; k++) {
+            for (int j=-1; j<=0; j++) {
+              if (jDir==0 && i==-1) continue;
+              if (jDir==1 && j==-1) continue;
+              if (jDir==2 && k==-1) continue;
+              int iEdge = mesh->edgeIndex(1,jV0->meshPos(0)+i,jV0->meshPos(1)+j,jV0->meshPos(2)+k);
+              for (int iLocalDoF=0; iLocalDoF<polynomial_degree-1; iLocalDoF++) {
+                int iDoF = mesh->nVertices() + iEdge*(polynomial_degree-1) + iLocalDoF;
+                if (index_correction[iDoF]!=-1) {
+                  std::array<int,2> global_tuple = {index_correction[iDoF],index_correction[jDoF]};
+                  nonzero_entries.push_back(global_tuple);
+                }
+              }
+            }
+          }
+        }
+
+        // x-dir edges
+        for (int j=-1; j<=1; j++) {
+          for (int k=-1; k<=1; k++) {
+            for (int i=-1; i<=0; i++) {
+              if (jDir==0 && i==-1) continue;
+              if (jDir==1 && j==-1) continue;
+              if (jDir==2 && k==-1) continue;
+              int iEdge = mesh->edgeIndex(0,jV0->meshPos(0)+i,jV0->meshPos(1)+j,jV0->meshPos(2)+k);
+              for (int iLocalDoF=0; iLocalDoF<polynomial_degree-1; iLocalDoF++) {
+                int iDoF = mesh->nVertices() + iEdge*(polynomial_degree-1) + iLocalDoF;
+                if (index_correction[iDoF]!=-1) {
+                  std::array<int,2> global_tuple = {index_correction[iDoF],index_correction[jDoF]};
+                  nonzero_entries.push_back(global_tuple);
+                }
+              }
+            }
+          }
+        }
+      }
+
+      // iDoF: faces
+      if (num_dofs_per_face>0) {
+        // yz-dir faces
+        for (int i=-1; i<=1; i++) {
+          for (int j=-1; j<=0; j++) {
+            for (int k=-1; k<=0; k++) {
+              if (jDir==0 && i==-1) continue;
+              if (jDir==1 && j==-1) continue;
+              if (jDir==2 && k==-1) continue;
+              int iFace = mesh->faceIndex(0,jV0->meshPos(0)+i,jV0->meshPos(1)+j,jV0->meshPos(2)+k);
+              for (int iLocalDoF=0; iLocalDoF<num_dofs_per_face; iLocalDoF++) {
+                int iDoF = mesh->nVertices() + mesh->nEdges()*(polynomial_degree-1) + iFace*num_dofs_per_face + iLocalDoF;
+                if (index_correction[iDoF]!=-1) {
+                  std::array<int,2> global_tuple = {index_correction[iDoF],index_correction[jDoF]};
+                  nonzero_entries.push_back(global_tuple);
+                }              
+              }
+            }
+          }
+        }
+
+        // xz-dir faces
+        for (int j=-1; j<=1; j++) {
+          for (int i=-1; i<=0; i++) {
+            for (int k=-1; k<=0; k++) {
+              if (jDir==0 && i==-1) continue;
+              if (jDir==1 && j==-1) continue;
+              if (jDir==2 && k==-1) continue;
+              int iFace = mesh->faceIndex(1,jV0->meshPos(0)+i,jV0->meshPos(1)+j,jV0->meshPos(2)+k);
+              for (int iLocalDoF=0; iLocalDoF<num_dofs_per_face; iLocalDoF++) {
+                int iDoF = mesh->nVertices() + mesh->nEdges()*(polynomial_degree-1) + iFace*num_dofs_per_face + iLocalDoF;
+                if (index_correction[iDoF]!=-1) {
+                  std::array<int,2> global_tuple = {index_correction[iDoF],index_correction[jDoF]};
+                  nonzero_entries.push_back(global_tuple);
+                }              
+              }
+            }
+          }
+        }
+
+        // xy-dir faces
+        for (int k=-1; k<=1; k++) {
+          for (int i=-1; i<=0; i++) {
+            for (int j=-1; j<=0; j++) {
+              if (jDir==0 && i==-1) continue;
+              if (jDir==1 && j==-1) continue;
+              if (jDir==2 && k==-1) continue;
+              int iFace = mesh->faceIndex(2,jV0->meshPos(0)+i,jV0->meshPos(1)+j,jV0->meshPos(2)+k);
+              for (int iLocalDoF=0; iLocalDoF<num_dofs_per_face; iLocalDoF++) {
+                int iDoF = mesh->nVertices() + mesh->nEdges()*(polynomial_degree-1) + iFace*num_dofs_per_face + iLocalDoF;
+                if (index_correction[iDoF]!=-1) {
+                  std::array<int,2> global_tuple = {index_correction[iDoF],index_correction[jDoF]};
+                  nonzero_entries.push_back(global_tuple);
+                }              
+              }
+            }
+          }
+        }
+      }
+
+      // iDoF: cell dofs
+      if (num_dofs_per_cell>0) {
+        for (int i=-1; i<=0; i++) {
+          for (int j=-1; j<=0; j++) {
+            for (int k=-1; k<=0; k++) {
+              if (jDir==0 && i==-1) continue;
+              if (jDir==1 && j==-1) continue;
+              if (jDir==2 && k==-1) continue;
+              int iElement = mesh->elementIndex(jV0->meshPos(0)+i,jV0->meshPos(1)+j,jV0->meshPos(2)+k);
+              for (int iLocalDoF=0; iLocalDoF<num_dofs_per_cell; iLocalDoF++) {
+                int iDoF = mesh->nVertices() + mesh->nEdges()*(polynomial_degree-1) + mesh->nFaces()*num_dofs_per_face + iElement*num_dofs_per_cell + iLocalDoF;
+                if (index_correction[iDoF]!=-1) {
+                  std::array<int,2> global_tuple = {index_correction[iDoF],index_correction[jDoF]};
+                  nonzero_entries.push_back(global_tuple);
+                }
+              }
+            }
+          }
+        }        
+      }
+    } else if (jDoF<mesh->nVertices()+mesh->nEdges()*(polynomial_degree-1)+mesh->nFaces()*num_dofs_per_face) {
+      // jDoF represents a face dof
+      int jFace = (jDoF-mesh->nVertices()-mesh->nEdges()*(polynomial_degree-1)) / num_dofs_per_face;
+      Vertex* jV00 = mesh->faceVertexPtr(0,0,jFace);
+      int jPerpDir=0;
+      if (mesh->faceVertexPtr(0,1,jFace)->meshPos(1) == jV00->meshPos(1)
+       && mesh->faceVertexPtr(1,0,jFace)->meshPos(1) == jV00->meshPos(1)) {
+        jPerpDir=1;
+      } else if (mesh->faceVertexPtr(0,1,jFace)->meshPos(2) == jV00->meshPos(2)
+               && mesh->faceVertexPtr(1,0,jFace)->meshPos(2) == jV00->meshPos(2)) {
+        jPerpDir=2;
+      }
+
+      // iDoF: vertices
+      for (int i=-1; i<=1; i++) {
+        for (int j=-1; j<=1; j++) {
+          for (int k=-1; k<=1; k++) {
+            if (jPerpDir==0 && (j==-1 || k==-1)) continue;
+            if (jPerpDir==1 && (i==-1 || k==-1)) continue;
+            if (jPerpDir==2 && (i==-1 || j==-1)) continue;
+            int iDoF = mesh->vertexIndex(jV00->meshPos(0)+i,jV00->meshPos(1)+j,jV00->meshPos(2)+k);
+            if (index_correction[iDoF]!=-1) {
+              std::array<int,2> global_tuple = {index_correction[iDoF],index_correction[jDoF]};
+              nonzero_entries.push_back(global_tuple);
+            }
+          }
+        }
+      }
+
+      // iDoF: edges
+      if (polynomial_degree>1) {
+        // z-dir edges
+        for (int i=-1; i<=1; i++) {
+          for (int j=-1; j<=1; j++) {
+            for (int k=-1; k<=0; k++) {
+            if (jPerpDir==0 && (j==-1 || k==-1)) continue;
+            if (jPerpDir==1 && (i==-1 || k==-1)) continue;
+            if (jPerpDir==2 && (i==-1 || j==-1)) continue;
+              int iEdge = mesh->edgeIndex(2,jV00->meshPos(0)+i,jV00->meshPos(1)+j,jV00->meshPos(2)+k);
+              for (int iLocalDoF=0; iLocalDoF<polynomial_degree-1; iLocalDoF++) {
+                int iDoF = mesh->nVertices() + iEdge*(polynomial_degree-1) + iLocalDoF;
+                if (index_correction[iDoF]!=-1) {
+                  std::array<int,2> global_tuple = {index_correction[iDoF],index_correction[jDoF]};
+                  nonzero_entries.push_back(global_tuple);
+                }
+              }
+            }
+          }
+        }
+
+        // y-dir edges
+        for (int i=-1; i<=1; i++) {
+          for (int k=-1; k<=1; k++) {
+            for (int j=-1; j<=0; j++) {
+              if (jPerpDir==0 && (j==-1 || k==-1)) continue;
+              if (jPerpDir==1 && (i==-1 || k==-1)) continue;
+              if (jPerpDir==2 && (i==-1 || j==-1)) continue;
+              int iEdge = mesh->edgeIndex(1,jV00->meshPos(0)+i,jV00->meshPos(1)+j,jV00->meshPos(2)+k);
+              for (int iLocalDoF=0; iLocalDoF<polynomial_degree-1; iLocalDoF++) {
+                int iDoF = mesh->nVertices() + iEdge*(polynomial_degree-1) + iLocalDoF;
+                if (index_correction[iDoF]!=-1) {
+                  std::array<int,2> global_tuple = {index_correction[iDoF],index_correction[jDoF]};
+                  nonzero_entries.push_back(global_tuple);
+                }
+              }
+            }
+          }
+        }
+
+        // x-dir edges
+        for (int j=-1; j<=1; j++) {
+          for (int k=-1; k<=1; k++) {
+            for (int i=-1; i<=0; i++) {
+              if (jPerpDir==0 && (j==-1 || k==-1)) continue;
+              if (jPerpDir==1 && (i==-1 || k==-1)) continue;
+              if (jPerpDir==2 && (i==-1 || j==-1)) continue;
+              int iEdge = mesh->edgeIndex(0,jV00->meshPos(0)+i,jV00->meshPos(1)+j,jV00->meshPos(2)+k);
+              for (int iLocalDoF=0; iLocalDoF<polynomial_degree-1; iLocalDoF++) {
+                int iDoF = mesh->nVertices() + iEdge*(polynomial_degree-1) + iLocalDoF;
+                if (index_correction[iDoF]!=-1) {
+                  std::array<int,2> global_tuple = {index_correction[iDoF],index_correction[jDoF]};
+                  nonzero_entries.push_back(global_tuple);
+                }
+              }
+            }
+          }
+        }
+      }
+
+      // iDoF: faces
+      if (num_dofs_per_face>0) {
+        // yz-dir faces
+        for (int i=-1; i<=1; i++) {
+          for (int j=-1; j<=0; j++) {
+            for (int k=-1; k<=0; k++) {
+            if (jPerpDir==0 && (j==-1 || k==-1)) continue;
+            if (jPerpDir==1 && (i==-1 || k==-1)) continue;
+            if (jPerpDir==2 && (i==-1 || j==-1)) continue;
+              int iFace = mesh->faceIndex(0,jV00->meshPos(0)+i,jV00->meshPos(1)+j,jV00->meshPos(2)+k);
+              for (int iLocalDoF=0; iLocalDoF<num_dofs_per_face; iLocalDoF++) {
+                int iDoF = mesh->nVertices() + mesh->nEdges()*(polynomial_degree-1) + iFace*num_dofs_per_face + iLocalDoF;
+                if (index_correction[iDoF]!=-1) {
+                  std::array<int,2> global_tuple = {index_correction[iDoF],index_correction[jDoF]};
+                  nonzero_entries.push_back(global_tuple);
+                }              
+              }
+            }
+          }
+        }
+
+        // xz-dir faces
+        for (int j=-1; j<=1; j++) {
+          for (int i=-1; i<=0; i++) {
+            for (int k=-1; k<=0; k++) {
+            if (jPerpDir==0 && (j==-1 || k==-1)) continue;
+            if (jPerpDir==1 && (i==-1 || k==-1)) continue;
+            if (jPerpDir==2 && (i==-1 || j==-1)) continue;
+              int iFace = mesh->faceIndex(1,jV00->meshPos(0)+i,jV00->meshPos(1)+j,jV00->meshPos(2)+k);
+              for (int iLocalDoF=0; iLocalDoF<num_dofs_per_face; iLocalDoF++) {
+                int iDoF = mesh->nVertices() + mesh->nEdges()*(polynomial_degree-1) + iFace*num_dofs_per_face + iLocalDoF;
+                if (index_correction[iDoF]!=-1) {
+                  std::array<int,2> global_tuple = {index_correction[iDoF],index_correction[jDoF]};
+                  nonzero_entries.push_back(global_tuple);
+                }              
+              }
+            }
+          }
+        }
+
+        // xy-dir faces
+        for (int k=-1; k<=1; k++) {
+          for (int i=-1; i<=0; i++) {
+            for (int j=-1; j<=0; j++) {
+            if (jPerpDir==0 && (j==-1 || k==-1)) continue;
+            if (jPerpDir==1 && (i==-1 || k==-1)) continue;
+            if (jPerpDir==2 && (i==-1 || j==-1)) continue;
+              int iFace = mesh->faceIndex(2,jV00->meshPos(0)+i,jV00->meshPos(1)+j,jV00->meshPos(2)+k);
+              for (int iLocalDoF=0; iLocalDoF<num_dofs_per_face; iLocalDoF++) {
+                int iDoF = mesh->nVertices() + mesh->nEdges()*(polynomial_degree-1) + iFace*num_dofs_per_face + iLocalDoF;
+                if (index_correction[iDoF]!=-1) {
+                  std::array<int,2> global_tuple = {index_correction[iDoF],index_correction[jDoF]};
+                  nonzero_entries.push_back(global_tuple);
+                }              
+              }
+            }
+          }
+        }
+      }
+
+      // iDoF: cell dofs
+      if (num_dofs_per_cell>0) {
+        for (int i=-1; i<=0; i++) {
+          for (int j=-1; j<=0; j++) {
+            for (int k=-1; k<=0; k++) {
+            if (jPerpDir==0 && (j==-1 || k==-1)) continue;
+            if (jPerpDir==1 && (i==-1 || k==-1)) continue;
+            if (jPerpDir==2 && (i==-1 || j==-1)) continue;
+              int iElement = mesh->elementIndex(jV00->meshPos(0)+i,jV00->meshPos(1)+j,jV00->meshPos(2)+k);
+              for (int iLocalDoF=0; iLocalDoF<num_dofs_per_cell; iLocalDoF++) {
+                int iDoF = mesh->nVertices() + mesh->nEdges()*(polynomial_degree-1) + mesh->nFaces()*num_dofs_per_face + iElement*num_dofs_per_cell + iLocalDoF;
+                if (index_correction[iDoF]!=-1) {
+                  std::array<int,2> global_tuple = {index_correction[iDoF],index_correction[jDoF]};
+                  nonzero_entries.push_back(global_tuple);
+                }
+              }
+            }
+          }
+        }        
+      }
+    } else {
+      // jDoF represents a cell dof
+      int jElement = (jDoF-mesh->nVertices()-mesh->nEdges()*(polynomial_degree-1)-mesh->nFaces()*num_dofs_per_face) / num_dofs_per_cell;
+      for (int iLocalDoF=0; iLocalDoF<the_ds_elements[jElement].nDoFs(); iLocalDoF++) {
+        int iDoF = the_ds_elements[jElement].globalDoF(iLocalDoF);
+        if (index_correction[iDoF]!=-1) {
+          std::array<int,2> global_tuple = {index_correction[iDoF],index_correction[jDoF]};
+          nonzero_entries.push_back(global_tuple);
+        }
+      }      
+    }
+  }
+
+
+/*
 
   // store all the possible entries by looping through elements
   std::vector<std::array<int,2>> nonzero_entries_collection;
@@ -603,6 +1096,9 @@ void DirectSerendipity::set_directserendipity(int polyDeg, int suppType, HexaMes
       nonzero_entries.push_back(index_tuple);
     }
   }
+
+*/
+
 
 }
 

@@ -334,6 +334,12 @@ namespace hexamesh {
     Point* faceCenterPtr(int i) { return &face_center[i]; };
     double faceRadius(int i) { return face_radius[i]; };
 
+    // return the index of edge by its direction and starting vertex index
+    int edgeIndex(int dir, int ix, int iy, int iz);
+
+    // return the index of face by its perpendicular direction and starting vertex index
+    int faceIndex(int perp_dir, int ix, int iy, int iz);
+
     // Return the element containing the point pt
     int inElement(const Point& pt);
 

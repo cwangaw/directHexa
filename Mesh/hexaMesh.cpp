@@ -831,6 +831,46 @@ void HexaMesh::faceCenter(int i, Point& center, double& radius) {
   return;
 }
 
+int HexaMesh::edgeIndex(int dir, int ix, int iy, int iz) {
+  if (dir==2) {
+    // z-dir edges
+    if (ix>=0 && ix<=num_x && iy>=0 && iy<=num_y && iz>=0 && iz<num_z) {
+       return ix*(num_y+1)*num_z + iy*num_z + iz;
+    }
+  } else if (dir==1) {
+    // y-dir edges
+    if (ix>=0 && ix<=num_x && iy>=0 && iy<num_y && iz>=0 && iz<=num_z) {
+      return (num_x+1)*(num_y+1)*num_z + ix*num_y*(num_z+1) + iy + iz*num_y;
+    }
+  } else {
+    // x-dir edges
+    if (ix>=0 && ix<num_x && iy>=0 && iy<=num_y && iz>=0 && iz<=num_z) {
+      return (num_x+1)*(num_y+1)*num_z + (num_x+1)*num_y*(num_z+1) + ix + iy*num_x*(num_z+1) + iz*num_x;
+    }
+  }
+  return -1; //default
+}
+
+int HexaMesh::faceIndex(int perp_dir, int ix, int iy, int iz) {
+  if (perp_dir==0) {
+    // yz-dir faces
+    if (ix>=0 && ix<=num_x && iy>=0 && iy<num_y && iz>=0 && iz<num_z) {
+      return ix*num_y*num_z + iy*num_z + iz;
+    }
+  } else if (perp_dir==1) {
+    // xz-dir faces
+    if (ix>=0 && ix<num_x && iy>=0 && iy<=num_y && iz>=0 && iz<num_z) {
+      return (num_x+1)*num_y*num_z + ix*num_z + iy*num_x*num_z + iz;
+    }
+  } else {
+    // xy-dir faces
+    if (ix>=0 && ix<num_x && iy>=0 && iy<num_y && iz>=0 && iz<=num_z) {
+      return (num_x+1)*num_y*num_z + num_x*(num_y+1)*num_z + ix*num_y + iy + iz*num_x*num_y;
+    }
+  }
+  return -1; //default
+}
+
 int HexaMesh::inElement(const Point& pt) {
   static int previousElementIndex = 0;
 
