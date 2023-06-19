@@ -96,27 +96,33 @@ namespace hexamesh {
     int my_mesh_pos[3];
     int my_mesh_index;
     bool good_element;
+    double my_diameter;
+    double chunkiness_parameter;
+    bool my_parity;
     HexaMesh* my_mesh = nullptr;
     int* vertex_global_index = nullptr;
     std::vector<std::vector<int>> subtetra_d;
     std::vector<std::vector<int>> subtetra_m;
 
-    void set_element(int ix, int iy, int iz, int i, HexaMesh* myMesh=nullptr);
+    void set_element(int ix, int iy, int iz, int i, bool parity, HexaMesh* myMesh=nullptr);
 
   public:
-    Element(int ix, int iy, int iz, int i, HexaMesh* myMesh=nullptr) {
-      set_element(ix, iy, iz, i, myMesh); };
+    Element(int ix, int iy, int iz, int i, bool parity, HexaMesh* myMesh=nullptr) {
+      set_element(ix, iy, iz, i, parity, myMesh); };
     Element() :
-		    my_mesh_pos(), my_mesh_index(), good_element(0), subtetra_d(), subtetra_m() {};
+		    my_mesh_pos(), my_mesh_index(), good_element(0), my_parity(0), subtetra_d(), subtetra_m() {};
     ~Element();
 
-    void set(int ix, int iy, int iz, int i, HexaMesh* myMesh=nullptr) {
-      set_element(ix, iy, iz, i, myMesh); };
+    void set(int ix, int iy, int iz, int i, bool parity, HexaMesh* myMesh=nullptr) {
+      set_element(ix, iy, iz, i, parity, myMesh); };
     
     HexaMesh* mesh() const { return my_mesh; };
     int meshPos(int i) const { return my_mesh_pos[i % 3]; };
     int meshIndex() const { return my_mesh_index; };
     bool isGood() const { return good_element; };
+    bool parity() const { return my_parity; };
+    double diameter() const { return my_diameter; };
+    double chunkiness() const { return chunkiness_parameter; };
 
     // Access functions and index mapping functions
 
@@ -257,6 +263,11 @@ namespace hexamesh {
     Vertex* the_vertices = nullptr;
     Element* the_elements = nullptr;
 
+    double chunkiness_parameter;
+    double average_chunkiness;
+    double max_diameter;
+    double average_diameter;
+
     Point* face_center = nullptr;
     double* face_radius = nullptr;
 
@@ -272,19 +283,20 @@ namespace hexamesh {
 
     void faceCenter(int i, Point& center, double& radius);
 
-    void set_hexamesh(int nx, int ny, int nz, Point* vertices);
+    void set_hexamesh(int nx, int ny, int nz, Point* vertices, bool* parity=nullptr);
 
   public:
-    HexaMesh(int nx, int ny, int nz, Point* vertices) {
-      set_hexamesh(nx,ny,nz,vertices); };
+    HexaMesh(int nx, int ny, int nz, Point* vertices, bool* parity=nullptr) {
+      set_hexamesh(nx,ny,nz,vertices,parity); };
     HexaMesh() : num_x(1), num_y(1), num_z(1), 
                  min_x(0), max_x(1), min_y(0), max_y(1), min_z(0), max_z(1), 
-                 num_elements(0), num_vertices(0), good_mesh(0) {};
+                 num_elements(0), num_vertices(0), good_mesh(0), 
+                 chunkiness_parameter(0), average_chunkiness(0), max_diameter(0), average_diameter(0) {};
     HexaMesh(Element* single_element); // Create a one element mesh from an element
     ~HexaMesh();
 
-    void set(int nx, int ny, int nz, Point* vertices) {
-      set_hexamesh(nx,ny,nz,vertices); };
+    void set(int nx, int ny, int nz, Point* vertices, bool* parity=nullptr) {
+      set_hexamesh(nx,ny,nz,vertices,parity); };
 
     // Create a mesh with rectangular cuboidal domain
     int createMesh(char meshType, int nx, int ny, int nz, 
@@ -314,6 +326,10 @@ namespace hexamesh {
     double yMax() const { return max_y; };
     double zMax() const { return max_z; };
     bool isGood() const { return good_mesh; };
+    double chunkiness() const { return chunkiness_parameter; };
+    double avrgChunkiness() const { return average_chunkiness; };
+    double diameter() const { return max_diameter; };
+    double avrgDiameter() const { return average_diameter; };
     
     // Access the element by its position in the array
     Element* elementPtr(int i) { return &the_elements[i % num_elements]; };

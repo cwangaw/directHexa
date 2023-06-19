@@ -55,11 +55,9 @@ void DirectSerendipityFE::set_directserendipityfe(DirectSerendipity* dsSpace, El
 
   if (global_dofs) delete[] global_dofs;
   global_dofs = new int[num_dofs];
-
   for(int i=0; i<8; i++) {
     global_dofs[i] = element->vertexGlobal(i);
   }
-
   for (int iEdge=0; iEdge<12; iEdge++) {
     int iEdge_global = element->edgeGlobal(iEdge);
     for (int jDoF=0; jDoF<polynomial_degree-1; jDoF++) {
@@ -340,6 +338,8 @@ double DirectSerendipityFE::edgeCheby(int iEdge, int nPt, int s) {
 }
 
 void DirectSerendipityFE::specFunc(int dir, const Point& pt, double& value, Tensor1& gradvalue) {
+  dir = dir%3;
+
   switch(my_ds_space->supplementType()) {
   case 0: case 1: {
     // piecewise polynomial with T_D or T_M
@@ -409,6 +409,8 @@ void DirectSerendipityFE::specFunc(int dir, const Point& pt, double& value, Tens
 }
 
 void DirectSerendipityFE::edgePsi(int dir, const Point& pt, double& value, Tensor1& gradvalue) {
+  dir = dir%3;
+
   switch (my_ds_space->supplementType()) {
   case 0: case 1: {
     // piecewise polynomial with T_D and T_M
@@ -509,75 +511,70 @@ void DirectSerendipityFE::edgePsi(int dir, const Point& pt, double& value, Tenso
     Point eval_p0, eval_p1;
     double R0, R1; Tensor1 gradR0, gradR1;
     double A0, B0, A1, B1;
-    Tensor2 chain0=df_inv, chain1=df_inv, dftemp; double jactemp;
+    Tensor2 chain0, chain1, dftemp; double jactemp;
 
-    switch (dir) {
-      case 0: {
-        eval_p0 = my_element->forwardMap(Point(p_orig[0],1,p_orig[2])); //y
-        my_element->dForwardMap(Point(p_orig[0],1,p_orig[2]),dftemp,jactemp);
+    if (dir==0) {
+      eval_p0 = my_element->forwardMap(Point(p_orig[0],1,p_orig[2])); //y
+      my_element->dForwardMap(Point(p_orig[0],1,p_orig[2]),dftemp,jactemp);
 
-        chain0 = dftemp;
-        chain0 *= Tensor2(1,0,0,0,0,0,0,0,1);
-        chain0 *= df_inv;
+      chain0 = dftemp;
+      chain0 *= Tensor2(1,0,0,0,0,0,0,0,1);
+      chain0 *= df_inv;
 
-        eval_p1 = my_element->forwardMap(Point(p_orig[0],p_orig[1],1)); //z
-        my_element->dForwardMap(Point(p_orig[0],p_orig[1],1),dftemp,jactemp);
+      eval_p1 = my_element->forwardMap(Point(p_orig[0],p_orig[1],1)); //z
+      my_element->dForwardMap(Point(p_orig[0],p_orig[1],1),dftemp,jactemp);
 
-        chain1 = dftemp;
-        chain1 *= Tensor2(1,0,0,0,1,0,0,0,0); 
-        chain1 *= df_inv;
-        break;
-      }
-      case 1: {
-        eval_p0 = my_element->forwardMap(Point(p_orig[0],p_orig[1],1)); //z
-        my_element->dForwardMap(Point(p_orig[0],p_orig[1],1),dftemp,jactemp);
+      chain1 = dftemp;
+      chain1 *= Tensor2(1,0,0,0,1,0,0,0,0); 
+      chain1 *= df_inv;
+    } else if (dir==1) {
+      eval_p0 = my_element->forwardMap(Point(p_orig[0],p_orig[1],1)); //z
+      my_element->dForwardMap(Point(p_orig[0],p_orig[1],1),dftemp,jactemp);
 
-        chain0 = dftemp;
-        chain0 *=  Tensor2(1,0,0,0,1,0,0,0,0);
-        chain0 *= df_inv;
+      chain0 = dftemp;
+      chain0 *= Tensor2(1,0,0,0,1,0,0,0,0);
+      chain0 *= df_inv;
 
-        eval_p1 = my_element->forwardMap(Point(1,p_orig[1],p_orig[2])); //x
-        my_element->dForwardMap(Point(1,p_orig[1],p_orig[2]),dftemp,jactemp);
+      eval_p1 = my_element->forwardMap(Point(1,p_orig[1],p_orig[2])); //x
+      my_element->dForwardMap(Point(1,p_orig[1],p_orig[2]),dftemp,jactemp);
 
-        chain1 = dftemp;
-        chain1 *= Tensor2(0,0,0,0,1,0,0,0,1); 
-        chain1 *= df_inv;
-        break;
-      }
-      case 2: {
-        eval_p0 = my_element->forwardMap(Point(1,p_orig[1],p_orig[2])); //x
-        my_element->dForwardMap(Point(1,p_orig[1],p_orig[2]),dftemp,jactemp);
+      chain1 = dftemp;
+      chain1 *= Tensor2(0,0,0,0,1,0,0,0,1); 
+      chain1 *= df_inv;      
+    } else {
+      eval_p0 = my_element->forwardMap(Point(1,p_orig[1],p_orig[2])); //x
+      my_element->dForwardMap(Point(1,p_orig[1],p_orig[2]),dftemp,jactemp);
 
-        chain0 = dftemp;
-        chain0 *=  Tensor2(0,0,0,0,1,0,0,0,1);
-        chain0 *= df_inv;
+      chain0 = dftemp;
+      chain0 *= Tensor2(0,0,0,0,1,0,0,0,1); 
+      chain0 *= df_inv;
 
-        eval_p1 = my_element->forwardMap(Point(p_orig[0],1,p_orig[2])); //y
-        my_element->dForwardMap(Point(p_orig[0],1,p_orig[2]),dftemp,jactemp);
+      eval_p1 = my_element->forwardMap(Point(p_orig[0],1,p_orig[2])); //y
+      my_element->dForwardMap(Point(p_orig[0],1,p_orig[2]),dftemp,jactemp);
 
-        chain1 = dftemp;
-        chain1 *= Tensor2(1,0,0,0,0,0,0,0,1); 
-        chain1 *= df_inv;
-        break;
-      }
+      chain1 = dftemp;
+      chain1 *= Tensor2(1,0,0,0,0,0,0,0,1);
+      chain1 *= df_inv;
     }
 
-    specFunc((dir+2)%3,eval_p0,R0,gradR0);
-    specFunc((dir+1)%3,eval_p1,R1,gradR1);
+    int dir0 = (dir+2)%3;
+    int dir1 = (dir+1)%3;
 
-    getAB((dir+2)%3*2,dir*2,iEdge,A0,B0);
-    getAB((dir+1)%3*2,dir*2,iEdge,A1,B1);
+    specFunc(dir0,eval_p0,R0,gradR0);
+    specFunc(dir1,eval_p1,R1,gradR1);
 
-    double psi0 = (my_element->lambda((dir+2)%3*2,eval_p0)-0.5*B0*my_element->lambda(dir*2,eval_p0)*(1+R0))/A0;
-    double psi1 = (my_element->lambda((dir+1)%3*2,eval_p1)-0.5*B1*my_element->lambda(dir*2,eval_p1)*(1+R1))/A1;
+    getAB(dir0*2,dir*2,iEdge,A0,B0);
+    getAB(dir1*2,dir*2,iEdge,A1,B1);
+
+    double psi0 = (my_element->lambda(dir0*2,eval_p0)-0.5*B0*my_element->lambda(dir*2,eval_p0)*(1+R0))/A0;
+    double psi1 = (my_element->lambda(dir1*2,eval_p1)-0.5*B1*my_element->lambda(dir*2,eval_p1)*(1+R1))/A1;
 
     value = psi0 * psi1;
 
-    Tensor1 gradpsi0((my_element->dLambda((dir+2)%3*2)-0.5*B0*(my_element->dLambda(dir*2)*(1+R0)+my_element->lambda(dir*2,eval_p0)*gradR0))/A0);
-    Tensor1 gradpsi1((my_element->dLambda((dir+1)%3*2)-0.5*B1*(my_element->dLambda(dir*2)*(1+R1)+my_element->lambda(dir*2,eval_p1)*gradR1))/A1);
+    Tensor1 gradpsi0((my_element->dLambda(dir0*2)-0.5*B0*(my_element->dLambda(dir*2)*(1+R0)+my_element->lambda(dir*2,eval_p0)*gradR0))/A0);
+    Tensor1 gradpsi1((my_element->dLambda(dir1*2)-0.5*B1*(my_element->dLambda(dir*2)*(1+R1)+my_element->lambda(dir*2,eval_p1)*gradR1))/A1);
     gradvalue = Tensor1(gradpsi0*chain0.col(0), gradpsi0*chain0.col(1), gradpsi0*chain0.col(2)) * psi1
               + Tensor1(gradpsi1*chain1.col(0), gradpsi1*chain1.col(1), gradpsi1*chain1.col(2)) * psi0;
-
     break;
   }
   default: return;

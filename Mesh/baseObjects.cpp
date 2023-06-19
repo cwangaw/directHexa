@@ -61,18 +61,18 @@ void Tensor2::mult(const Tensor2& t, Tensor2& result) const {
 }
 
 Tensor2& Tensor2::operator*=(const Tensor2& t) {
-  double t00 = the_tensor[0][0];
-  the_tensor[0][0] = t00*t.the_tensor[0][0] + the_tensor[0][1]*t.the_tensor[1][0] + the_tensor[0][2]*t.the_tensor[2][0];
-  the_tensor[0][1] = t00*t.the_tensor[0][1] + the_tensor[0][1]*t.the_tensor[1][1] + the_tensor[0][2]*t.the_tensor[2][1];
-  the_tensor[0][2] = t00*t.the_tensor[0][2] + the_tensor[0][1]*t.the_tensor[1][2] + the_tensor[0][2]*t.the_tensor[2][2];
-  double t10 = the_tensor[1][0];
-  the_tensor[1][0] = t10*t.the_tensor[0][0] + the_tensor[1][1]*t.the_tensor[1][0] + the_tensor[1][2]*t.the_tensor[2][0];
-  the_tensor[1][1] = t10*t.the_tensor[0][1] + the_tensor[1][1]*t.the_tensor[1][1] + the_tensor[1][2]*t.the_tensor[2][1];
-  the_tensor[1][2] = t10*t.the_tensor[0][2] + the_tensor[1][1]*t.the_tensor[1][2] + the_tensor[1][2]*t.the_tensor[2][2];
-  double t20 = the_tensor[2][0];
-  the_tensor[2][0] = t20*t.the_tensor[0][0] + the_tensor[2][1]*t.the_tensor[1][0] + the_tensor[2][2]*t.the_tensor[2][0];
-  the_tensor[2][1] = t20*t.the_tensor[0][1] + the_tensor[2][1]*t.the_tensor[1][1] + the_tensor[2][2]*t.the_tensor[2][1];
-  the_tensor[2][2] = t20*t.the_tensor[0][2] + the_tensor[2][1]*t.the_tensor[1][2] + the_tensor[2][2]*t.the_tensor[2][2];
+  double t00 = the_tensor[0][0], t01 = the_tensor[0][1], t02 = the_tensor[0][2]; 
+  the_tensor[0][0] = t00*t.the_tensor[0][0] + t01*t.the_tensor[1][0] + t02*t.the_tensor[2][0];
+  the_tensor[0][1] = t00*t.the_tensor[0][1] + t01*t.the_tensor[1][1] + t02*t.the_tensor[2][1];
+  the_tensor[0][2] = t00*t.the_tensor[0][2] + t01*t.the_tensor[1][2] + t02*t.the_tensor[2][2];
+  double t10 = the_tensor[1][0], t11 = the_tensor[1][1], t12 = the_tensor[1][2];
+  the_tensor[1][0] = t10*t.the_tensor[0][0] + t11*t.the_tensor[1][0] + t12*t.the_tensor[2][0];
+  the_tensor[1][1] = t10*t.the_tensor[0][1] + t11*t.the_tensor[1][1] + t12*t.the_tensor[2][1];
+  the_tensor[1][2] = t10*t.the_tensor[0][2] + t11*t.the_tensor[1][2] + t12*t.the_tensor[2][2];
+  double t20 = the_tensor[2][0], t21 = the_tensor[2][1], t22 = the_tensor[2][2];
+  the_tensor[2][0] = t20*t.the_tensor[0][0] + t21*t.the_tensor[1][0] + t22*t.the_tensor[2][0];
+  the_tensor[2][1] = t20*t.the_tensor[0][1] + t21*t.the_tensor[1][1] + t22*t.the_tensor[2][1];
+  the_tensor[2][2] = t20*t.the_tensor[0][2] + t21*t.the_tensor[1][2] + t22*t.the_tensor[2][2];
   return *this;
 }
 

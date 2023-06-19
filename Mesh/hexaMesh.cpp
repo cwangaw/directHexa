@@ -39,15 +39,16 @@ int Vertex::write_raw(std::string& filename) const {
 
 ////////////////////////////////////////////////////////////////////////////////
 // Class Element
-static const double element_eps = 1e-12;
+static const double element_eps = 1e-14;
 
-void Element::set_element(int ix, int iy, int iz, int i, HexaMesh* myMesh) {
+void Element::set_element(int ix, int iy, int iz, int i, bool parity, HexaMesh* myMesh) {
   my_mesh_pos[0] = ix;
   my_mesh_pos[1] = iy;
   my_mesh_pos[2] = iz;
   my_mesh_index = i;
   my_mesh = myMesh;
   good_element = true;
+  my_parity = parity;
 
   if(vertex_global_index) delete[] vertex_global_index;
   vertex_global_index = new int[8];
@@ -66,8 +67,45 @@ void Element::set_element(int ix, int iy, int iz, int i, HexaMesh* myMesh) {
     if ( Tensor1(*faceVertexPtr(1,1,iFace)-*faceVertexPtr(0,0,iFace))*normal(iFace)  > element_eps ) good_element = false;
   }
 
+  my_diameter = 0;
+  for (int ix=0; ix<2; ix++) {
+    for (int iy=0; iy<2; iy++) {
+      Vertex* v0 = my_mesh -> vertexPtr(meshPos(0)+ix, meshPos(1)+iy, meshPos(2));
+      Vertex* v1 = my_mesh -> vertexPtr(meshPos(0)+1-ix, meshPos(1)+1-iy, meshPos(2)+1);
+      if (Tensor1(*v1-*v0).norm() > my_diameter) my_diameter = Tensor1(*v1-*v0).norm();
+    }
+  }
+
+  double rho = my_diameter;
+  for (int ix = 0; ix < 2; ix++) {
+    for (int iy = 0; iy < 2; iy++) {
+      for (int iz = 0; iz < 2; iz++) {
+        // We find it as the intersection of f02, f12, f23
+        
+        Tensor1 nu3 = cross(*vertexPtr(2*ix-1,1-2*iy,2*iz-1)-*vertexPtr(1-2*ix,2*iy-1,2*iz-1), *vertexPtr(2*ix-1,2*iy-1,1-2*iz)-*vertexPtr(1-2*ix,2*iy-1,2*iz-1));
+        nu3 /= nu3.norm();
+        if (Tensor1(*vertexPtr(2*ix-1,2*iy-1,2*iz-1)-*vertexPtr(1-2*ix,2*iy-1,2*iz-1))*nu3 > element_eps) nu3 = -1*nu3;
+
+        Tensor1 nu_02 = normal(0,0,2*iz-1) - normal(2*ix-1,0,0);
+        Tensor1 nu_12 = normal(0,0,2*iz-1) - normal(0,2*iy-1,0);
+        Tensor1 nu_23 = normal(0,0,2*iz-1) - nu3;
+
+        Tensor2 A(nu_02.val(0),nu_02.val(1),nu_02.val(2), 
+                nu_12.val(0),nu_12.val(1),nu_12.val(2),
+                nu_23.val(0),nu_23.val(1),nu_23.val(2));
+        Tensor2 invA;
+
+        (void) A.inverse(invA);
+        Point center(invA * Tensor1(Tensor1(*vertexPtr(2*ix-1,2*iy-1,2*iz-1))*nu_02, Tensor1(*vertexPtr(2*ix-1,2*iy-1,2*iz-1))*nu_12, Tensor1(*vertexPtr(2*ix-1,2*iy-1,2*iz-1))*normal(0,0,2*iz-1)-Tensor1(*vertexPtr(1-2*ix,2*iy-1,2*iz-1))*nu3));
+        double radius = lambda(0,0,2*iz-1, center);
+        if (radius < rho) rho = radius;
+      }
+    }
+  }
+  chunkiness_parameter = rho / my_diameter;
+
   subtetra_d.clear();
-  if ((my_mesh_pos[0]+my_mesh_pos[1]+my_mesh_pos[2]) % 2 == 0) {
+  if (parity == 0) {
     // boundary tetra with a vertex at v_{-1,-2,-3}
     subtetra_d.push_back({vertexIndex(-1,-1,-1), vertexIndex(1,-1,-1), vertexIndex(-1,1,-1), vertexIndex(-1,-1,1)});
     // boundary tetra with a vertex at v_{-1,2,3}
@@ -103,7 +141,7 @@ void Element::set_element(int ix, int iy, int iz, int i, HexaMesh* myMesh) {
   // T_{3,-1}
   subtetra_m.push_back({vertexIndex(1,1,1), vertexIndex(-1,-1,-1), vertexIndex(-1,-1,1), vertexIndex(-1,1,1)});
   // T_{3,-2}
-  subtetra_m.push_back({vertexIndex(1,1,1), vertexIndex(-1,-1,-1), vertexIndex(-1,-1,1), vertexIndex(1,-1,1)});     
+  subtetra_m.push_back({vertexIndex(1,1,1), vertexIndex(-1,-1,-1), vertexIndex(-1,-1,1), vertexIndex(1,-1,1)});   
 }
 
 Element::~Element() {
@@ -461,6 +499,7 @@ void Element::write_raw(std::ofstream& fout) {
     faceVertexPtr(1, 0, i_check)->write_raw(fout);
     fout << "    v11:\n\t\t";
     faceVertexPtr(1, 1, i_check)->write_raw(fout);
+    fout << "    normal vector: " << normal(i_check) << "\n";
   }
 }
 
@@ -474,7 +513,7 @@ int Element::write_raw(std::string& filename) {
 ////////////////////////////////////////////////////////////////////////////////
 // Class HexaMesh
 
-void HexaMesh::set_hexamesh(int nx, int ny, int nz, Point* vertices) {
+void HexaMesh::set_hexamesh(int nx, int ny, int nz, Point* vertices, bool* parity) {
   num_x = nx; num_y= ny; num_z = nz;
   num_elements = nx*ny*nz;
   num_vertices = (nx+1)*(ny+1)*(nz+1);
@@ -510,15 +549,31 @@ void HexaMesh::set_hexamesh(int nx, int ny, int nz, Point* vertices) {
       }
     }
   }
+  bool this_parity;
+  chunkiness_parameter = 1;
+  max_diameter = 0;
+  average_chunkiness = 0;
+  average_diameter = 0;
   for (int ix=0; ix<nx; ix++) {
     for (int iy=0; iy<ny; iy++) {
       for (int iz=0; iz<nz; iz++) {
         int element_index = elementIndex(ix,iy,iz);
-        the_elements[element_index].set(ix,iy,iz,element_index,this);
-        if (!the_elements[element_index].isGood()) return; 
+        if (parity==nullptr) {
+          this_parity = (ix+iy+iz) % 2;
+        } else {
+          this_parity = parity[element_index];
+        }
+        the_elements[element_index].set(ix,iy,iz,element_index,this_parity,this);
+        if (!the_elements[element_index].isGood()) return;
+        average_chunkiness += the_elements[element_index].chunkiness();
+        average_diameter += the_elements[element_index].diameter();
+        if (chunkiness_parameter > the_elements[element_index].chunkiness()) chunkiness_parameter = the_elements[element_index].chunkiness();
+        if (max_diameter < the_elements[element_index].diameter()) max_diameter = the_elements[element_index].diameter();
       }
     }
   }
+  average_chunkiness /= num_elements;
+  average_diameter /= num_elements;
 
   Point center; double radius;
   for (int i=0; i<nFaces(); i++) {
@@ -527,6 +582,7 @@ void HexaMesh::set_hexamesh(int nx, int ny, int nz, Point* vertices) {
     face_radius[i] = radius;
   }
   good_mesh = true;
+
 }
 
 HexaMesh::HexaMesh(Element* single_element){
@@ -534,7 +590,9 @@ HexaMesh::HexaMesh(Element* single_element){
   for (int i=0; i<8; i++) {
     vertices[i] = Point(single_element->vertexPtr(i)->val(0), single_element->vertexPtr(i)->val(1), single_element->vertexPtr(i)->val(2));
   }
-  set(1,1,1,vertices);
+  bool single_parity[1];
+  single_parity[0] = single_element->parity();
+  set(1,1,1,vertices,single_parity);
 }
 
 int HexaMesh::createMesh(char meshTypeC, int nx, int ny, int nz, 

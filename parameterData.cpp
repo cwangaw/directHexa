@@ -191,7 +191,6 @@ int ParameterData::read() {
     if(distortion_factor >= 0.5) return processReaderError(ERR_BAD_DATA);
 
     mesh.createMesh(meshTypeC, nx,ny,nz, xMin,xMax, yMin,yMax, zMin,zMax, distortion_factor);
-    
     break;
   }
   default:

@@ -224,7 +224,7 @@ void DirectSerendipityArray::l2normError(double& l2Error, double& l2GradError, d
 					 double (*referenceFcn)(double,double,double),
 					 Tensor1 (*referenceGradFcn)(double,double,double)) {
   l2Error = 0, l2GradError = 0, l2Norm = 0, l2GradNorm = 0;
-  Quadrature quadRule(8);
+  Quadrature quadRule(10);
 
   for(int iElement=0; iElement < my_ds_space->mesh()->nElements(); iElement++) {
     DirectSerendipityFE* fePtr = my_ds_space->finiteElementPtr(iElement);
@@ -444,6 +444,7 @@ void DirectSerendipity::set_directserendipity(int polyDeg, int suppType, HexaMes
 
   // ALLOCATE ELEMENTS
 
+
   if(the_ds_elements) delete[] the_ds_elements;
   the_ds_elements = new DirectSerendipityFE[my_mesh->nElements()];
   for(int iElement=0; iElement<my_mesh->nElements(); iElement++) { 
@@ -539,7 +540,7 @@ void DirectSerendipity::set_directserendipity(int polyDeg, int suppType, HexaMes
       index++;      
     }
   }
-
+  
   // set up index correction and bc correction
   if (index_correction) delete[] index_correction;
   index_correction = new int[num_dofs];
