@@ -3,8 +3,7 @@
 
 #include <cmath>
 #include <iostream>
-
-//#include "debug.h"
+#include "debug.h"
 
 ////////////////////////////////////////////////////////////////////////////////
 // Base Objects
@@ -37,8 +36,6 @@ class Point {
   double& val(int i)               { return the_point[i % 3]; }
   double  val(int i)         const { return the_point[i % 3]; }
 
-
-  // Should we change it to approx equal?
   bool operator==(const Point& p1) const {
   return the_point[0]==p1.the_point[0] && the_point[1]==p1.the_point[1] && the_point[2]==p1.the_point[2]; }
   bool operator!=(const Point& p1) const {

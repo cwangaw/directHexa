@@ -839,12 +839,14 @@ Vertex* HexaMesh::faceVertexPtr(bool pm0, bool pm1, int i) {
     base_z = i % num_z;
     return vertexPtr(base_x, base_y+pm0, base_z+pm1);
   } else if (i < (num_x+1)*num_y*num_z+num_x*(num_y+1)*num_z) {
+    // xz-dir faces
     i -= (num_x+1)*num_y*num_z;
     base_y = i / (num_x*num_z);
     base_x = (i - base_y*num_x*num_z) / num_z;
     base_z = i % num_z;
     return vertexPtr(base_x+pm0, base_y, base_z+pm1);
   } else {
+    // xy-dir faces
     i -= (num_x+1)*num_y*num_z+num_x*(num_y+1)*num_z;
     base_z = i / (num_x*num_y);
     base_x = (i - base_z*num_x*num_y) / num_y;
@@ -854,7 +856,7 @@ Vertex* HexaMesh::faceVertexPtr(bool pm0, bool pm1, int i) {
 }
 
 void HexaMesh::faceCenter(int i, Point& center, double& radius) {
-  // Compute center of largest inscribed circle
+  // Compute the center of the largest inscribed circle
   double max_radius = 0;
   std::vector<Point> center_candidates;
   center_candidates.clear();

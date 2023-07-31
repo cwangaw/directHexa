@@ -124,7 +124,7 @@ Quadrature::~Quadrature() {
   if(my_wts_ref) delete[] my_wts_ref;
 }
 
-// Test degree of precision on a mesh over the domain [0,1]^2
+// Test degree of precision on a mesh over the domain [0,1]^3
 void quadrature::testQuadrature(hexamesh::HexaMesh* mesh, int supplement_type, int refinement_level, double eps, int toDOP) {
   auto f = [](Point& x, int i, int j, int k) { return std::pow(x[0],i)*std::pow(x[1],j)*std::pow(x[2],k); };
   auto trueIntegF = [](int i, int j, int k) { return 1/double(i+1)*1/double(j+1)*1/double(k+1); };

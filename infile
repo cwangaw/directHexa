@@ -8,8 +8,8 @@ r		      # meshType ('o' = regularly deviated in one direction (x),
 0,1        	  # xMin,xMax
 0,1        	  # yMin,yMax 
 0,1        	  # zMin,zMax 
-4,4,4   	   # nx,ny,nz
-0.075         # distortion factor 0.075 0.063 0.055 0.056 
+8,8,8   	   # nx,ny,nz
+0.063         # distortion factor 0.075 0.063 0.055 0.056 
 
 ### FINITE ELEMENTS ###########################################################
 
@@ -19,10 +19,10 @@ r		      # meshType ('o' = regularly deviated in one direction (x),
 
 ### OUTPUT PARAMETERS ########################################################
 
-0			        # Output DS solution (-1=omit, 0=none, 1=raw, 2=tecplot)
+2			        # Output DS solution (-1=omit, 0=none, 1=raw, 2=tecplot)
 21,21,21      # numPtsDS_x,numPtsDS_y,numPtsDS_z number of x,y,z points for tecplot
 
-1			        # Mesh output format (0=none, 1=raw, 2=matlab)
+2			        # Mesh output format (0=none, 1=raw, 2=matlab)
 2			        # DS space output format (0=none, 1=raw, 2=tecplot)
 
 #MONITORING

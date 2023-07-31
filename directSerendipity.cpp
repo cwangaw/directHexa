@@ -224,7 +224,7 @@ void DirectSerendipityArray::l2normError(double& l2Error, double& l2GradError, d
 					 double (*referenceFcn)(double,double,double),
 					 Tensor1 (*referenceGradFcn)(double,double,double)) {
   l2Error = 0, l2GradError = 0, l2Norm = 0, l2GradNorm = 0;
-  Quadrature quadRule(10);
+  Quadrature quadRule(8);
 
   for(int iElement=0; iElement < my_ds_space->mesh()->nElements(); iElement++) {
     DirectSerendipityFE* fePtr = my_ds_space->finiteElementPtr(iElement);
@@ -1055,52 +1055,6 @@ void DirectSerendipity::set_directserendipity(int polyDeg, int suppType, HexaMes
       }      
     }
   }
-
-
-/*
-
-  // store all the possible entries by looping through elements
-  std::vector<std::array<int,2>> nonzero_entries_collection;
-  nonzero_entries_collection.clear();
-
-  for (int nElement=0; nElement<mesh->nElements(); nElement++) {
-    int num_element_dof = the_ds_elements[nElement].nDoFs();
-    for (int iDoF=0; iDoF<num_element_dof; iDoF++) {
-      for (int jDoF=0; jDoF<num_element_dof; jDoF++) {
-        int iGlobalDoF = index_correction[the_ds_elements[nElement].globalDoF(iDoF)];
-        int jGlobalDoF = index_correction[the_ds_elements[nElement].globalDoF(jDoF)];
-        if (iGlobalDoF == -1 || jGlobalDoF == -1) continue;
-        std::array<int,2> global_tuple = {iGlobalDoF, jGlobalDoF};
-
-        // check repetition
-        bool is_repeat = 0;
-        for (unsigned int iArray=0; iArray<nonzero_entries_collection.size(); iArray++) {
-          if (nonzero_entries_collection[iArray][0] == global_tuple[0] && nonzero_entries_collection[iArray][1] == global_tuple[1]) is_repeat = 1;
-        }
-        if (!is_repeat) nonzero_entries_collection.push_back(global_tuple);
-      }
-    }
-  }
-
-  // sort the nonzero entries in ascending order (col first, then row)
-  for (int jCol=0; jCol<nn; jCol++) {
-    std::vector<int> nonzero_entries_row;
-    nonzero_entries_row.clear();
-    for (unsigned int iArray=0; iArray<nonzero_entries_collection.size(); iArray++) {
-      if (nonzero_entries_collection[iArray][1] == jCol) {
-        nonzero_entries_row.push_back(nonzero_entries_collection[iArray][0]);
-      }
-    }
-    sort(nonzero_entries_row.begin(), nonzero_entries_row.end());
-    for (unsigned int iArray=0; iArray<nonzero_entries_row.size(); iArray++) {
-      std::array<int,2> index_tuple = {nonzero_entries_row[iArray], jCol};
-      nonzero_entries.push_back(index_tuple);
-    }
-  }
-
-*/
-
-
 }
 
 DirectSerendipity::~DirectSerendipity() {
@@ -1159,7 +1113,7 @@ void DirectSerendipity::bcModification(double* bc_vals) {
     ipiv = (lapack_int*)malloc(size * sizeof(lapack_int));
     double anorm = LAPACKE_dlange(LAPACK_ROW_MAJOR, norm, degPolyn()-1, degPolyn()-1, A, degPolyn()-1);
     int ierr = LAPACKE_dgesv(LAPACK_ROW_MAJOR, degPolyn()-1, 1, A, degPolyn()-1, ipiv, rhs, 1); //mat updated to be LU
-    if(ierr) { // ?? what should we do ???
+    if(ierr) {
       std::cerr << "ERROR: Lapack failed with code " << ierr << std::endl; 
     }
     double rcond = 0;
@@ -1199,7 +1153,7 @@ void DirectSerendipity::nodeModification(double* bc_vals) {
     ipiv = (lapack_int*)malloc(size * sizeof(lapack_int));
     double anorm = LAPACKE_dlange(LAPACK_ROW_MAJOR, norm, degPolyn()-1, degPolyn()-1, A, degPolyn()-1);
     int ierr = LAPACKE_dgesv(LAPACK_ROW_MAJOR, degPolyn()-1, 1, A, degPolyn()-1, ipiv, rhs, 1); //mat updated to be LU
-    if(ierr) { // ?? what should we do ???
+    if(ierr) {
       std::cerr << "ERROR: Lapack failed with code " << ierr << std::endl; 
     }
     double rcond = 0;

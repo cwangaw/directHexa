@@ -31,12 +31,6 @@ $(CODE): $(INC) $(SRC) $(TPL)
 	$(AR) ruv $(CODE) $(OBJ)
 	@rm -f $(OBJ)
 
-#testBase: $(CODE) testBase.cpp
-#	$(C++C) $(C++FLAGS) -o testBase testBase.cpp $(CODE)
-
-#testMesh: $(CODE) testMesh.cpp
-#	$(C++C) $(C++FLAGS) -o testMesh testMesh.cpp $(CODE)
-
 # Miscellaneous Rules =========================================================
 
 clean: 

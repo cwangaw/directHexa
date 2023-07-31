@@ -35,58 +35,7 @@ int EllipticPDE::solve(Monitor& monitor) {
 
   if(false) {
     monitor(1,"Test Quadrature Rules");
-    testQuadrature(&(param.mesh), param.supplement_type , param.refinement_level,1e-14);
-  }
-
-  // TEST BASIS FUNCTION ///////////////////////////////////////////////////////
-
-  if (false) {
-    DirectSerendipityArray testingarray(&(param.dsSpace));
-    for(int i=0; i<param.dsSpace.nDoFs(); i++) {
-      testingarray[i] = 0;  
-    }
-
-    testingarray[param.dsSpace.nVertexDoFs()+16] = 1;
-
-    std::string fileName(param.directory_name);
-    fileName += "test_mesh";
-    std::string fileNameGrad(param.directory_name);
-    fileNameGrad += "test_grad_mesh";
-    testingarray.write_tecplot_mesh(fileName,fileNameGrad,
-       param.output_mesh_numPts_DS_x,param.output_mesh_numPts_DS_y,param.output_mesh_numPts_DS_z);
-  }
-
-  // DEBUG ///////////////////////////////////////////////////////////
-
-  if (false) {
-  static const double PI = 3.141592653589793238462643383279502884197169399375105820974944;
-
-  auto f = [](Point& x) { return sin(PI*x[0])*sin(PI*x[1])*sin(PI*x[2]); };
-  auto trueIntegF = [] { return 8/pow(PI,3); };
-
-  Quadrature quadrature;
-
-  std::cout << std::endl;
-  for(int testDOP=2; testDOP<=20; testDOP++) {
-    quadrature.setRule(testDOP);
-    if(testDOP != quadrature.dop() ) continue;
-    std::cout << "DOP = " << testDOP << "\n";
-
-    double full_integ = 0;
-    for(int iElem=0; iElem<param.mesh.nElements(); iElem++) {
-      quadrature.setElement(param.dsSpace.supplementType(), param.refinement_level, param.mesh.elementPtr(iElem));
-
-      double integ = 0;
-      for(int l=0; l<quadrature.num(); l++) {
-      integ += f(quadrature.pts()[l])*quadrature.wt(l);
-      }
-    full_integ += integ;
-    }
-    double true_integ = trueIntegF();
-    double err = std::abs(true_integ - full_integ) / true_integ;
-    if(err > 1e-14) std::cout << "err = " << err << "\n";
-  }
-  std::cout << std::endl;
+    testQuadrature(&(param.mesh), param.supplement_type, param.refinement_level, 1e-14);
   }
 
   // SOLVE THE PDE ///////////////////////////////////////////////////////////
@@ -135,7 +84,7 @@ int EllipticPDE::solve(Monitor& monitor) {
   Ap[nn] = (*vec_ptr).size();
 
   // quadrature points
-  quadrature::Quadrature quadRule(10);
+  quadrature::Quadrature quadRule(8);
 
   monitor(1,"Matrix and RHS Assembly"); ////////////////////////////////////////
 
@@ -176,8 +125,7 @@ int EllipticPDE::solve(Monitor& monitor) {
         Tensor1 gradValj = fePtr->basisGrad(jNode, iPt); 
 
         for(int iNode=0; iNode<nn_loc; iNode++) {
-          //In case "shape functions" are not delta_{i,j} for BC nodes one day
-          //if on BC, we use nodal basis function, otherwise we use shape functions
+          // If on BC, we use nodal basis function, otherwise we use shape functions
 
           double vali = fePtr->basis(iNode, iPt);
           Tensor1 gradVali = fePtr->basisGrad(iNode, iPt);
